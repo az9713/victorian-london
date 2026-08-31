@@ -194,6 +194,14 @@ C.add_box(bm, PX0, PX1, BAL_TOP_RAIL_Y0, TOWER_PARAPET_TOP, PZ0, PZ1, mat_idx=MA
 # they meet (not coincident with those faces) so nothing z-fights.
 bal_y0, bal_y1 = BAL_Y0 + 0.10 - 0.01, BAL_TOP_RAIL_Y0 + 0.01
 BAL_SPACING = 0.55
+# corner newel posts (slightly heavier than the regular balusters) --
+# the per-edge loop below deliberately skips its own t=0/1 endpoints so
+# posts aren't doubled at a shared corner, but that left each corner gap
+# noticeably wider than the regular spacing, exposing the parapet slab's
+# own self-shadowed inner corner (near-black in church_balustrade.png).
+# A real balustrade has a post there anyway.
+for (px, pz) in ((PX0, PZ0), (PX1, PZ0), (PX0, PZ1), (PX1, PZ1)):
+    C.add_cylinder(bm, px, pz, bal_y0, bal_y1, 0.11, segments=8, mat_idx=MAT_STONE)
 for (xa, za, xb, zb) in ((PX0, PZ0, PX1, PZ0), (PX0, PZ1, PX1, PZ1),
                           (PX0, PZ0, PX0, PZ1), (PX1, PZ0, PX1, PZ1)):
     length = math.hypot(xb - xa, zb - za)
@@ -364,8 +372,12 @@ C.add_box(bm, x_door - 0.05, x_door + 0.05, pull_y - 0.06, pull_y + 0.06,
            0.35, 0.45, mat_idx=MAT_DARK)
 
 # ---- spire: 4-sided pyramid with lucarnes + finial ------------------------
+# Base corners match the coping rail's OUTER footprint (PX0/PX1/PZ0/PZ1), not
+# the narrower tower wall (TX0/TX1/TZ0/TZ1) -- the 5cm gap between the two
+# left a sliver of the rail's top face exposed right at each corner, nearly
+# unlit at a grazing angle (the near-black corner notch in qc_bal2.png).
 cx, cz = (TX0 + TX1) / 2.0, (TZ0 + TZ1) / 2.0
-sp_corners = [(TX0, TZ0), (TX1, TZ0), (TX1, TZ1), (TX0, TZ1)]
+sp_corners = [(PX0, PZ0), (PX1, PZ0), (PX1, PZ1), (PX0, PZ1)]
 apex_v = (cx, SPIRE_APEX, cz)
 for i in range(4):
     x0, z0 = sp_corners[i]
