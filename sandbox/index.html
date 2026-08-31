@@ -196,6 +196,25 @@ addEventListener('mousemove', e=>{
   if(document.pointerLockElement===renderer.domElement || dragging){
     P.yaw -= e.movementX*0.0025; P.pitch = Math.max(-1.2,Math.min(1.3,P.pitch - e.movementY*0.0025)); }});
 
+// occluders for the camera: solid boxes with their heights (from the same records)
+const occluders = L.boxes.filter(b => b.collide && b.kind !== 'bounds')
+  .map(b => ({x1:b.x1, z1:b.z1, x2:b.x2, z2:b.z2, y0:b.y0, y1:b.y1}));
+// segment vs AABB slab test -> nearest hit t in (0,1), or 1 if clear
+function occludeT(ox,oy,oz, dx,dy,dz){
+  let best = 1;
+  for (const b of occluders){
+    let t0=0, t1=1;
+    for (const [o,d,lo,hi] of [[ox,dx,b.x1,b.x2],[oy,dy,b.y0,b.y1],[oz,dz,b.z1,b.z2]]){
+      if (Math.abs(d) < 1e-9){ if (o < lo || o > hi){ t0=2; break; } continue; }
+      let a=(lo-o)/d, c=(hi-o)/d; if(a>c){const s=a;a=c;c=s;}
+      if(a>t0)t0=a; if(c<t1)t1=c;
+      if(t0>t1) break;
+    }
+    if (t0 <= t1 && t0 > 0.02 && t0 < best) best = t0;
+  }
+  return best;
+}
+
 // ---------- collision: circle vs AABB, 2 resolve passes ----------
 function collide(px,pz){
   for (let pass=0; pass<2; pass++) for (const c of colliders){
@@ -287,13 +306,15 @@ function tick(now){
     }
   }
 
-  // third-person camera
+  // third-person camera, pulled in when a wall occludes the player
   const ty=1.6, tx=player.position.x, tz=player.position.z;
   const cd=5.0;
-  gameplayCamera.position.set(
-    tx+Math.sin(P.yaw)*Math.cos(P.pitch)*cd,
-    Math.max(0.4, ty-Math.sin(P.pitch)*cd),
-    tz+Math.cos(P.yaw)*Math.cos(P.pitch)*cd);
+  const ox=Math.sin(P.yaw)*Math.cos(P.pitch)*cd,
+        oy=Math.max(0.4, ty-Math.sin(P.pitch)*cd)-ty,
+        oz=Math.cos(P.yaw)*Math.cos(P.pitch)*cd;
+  const t = occludeT(tx,ty,tz, ox,oy,oz);
+  const k = Math.max(0.12, t*0.95);           // stop just in front of the wall
+  gameplayCamera.position.set(tx+ox*k, ty+oy*k, tz+oz*k);
   gameplayCamera.lookAt(tx,ty,tz);
   const cam = (FAULT==='cam') ? debugCamera : gameplayCamera;   // 'cam' fault: stolen view
   _lastCam = cam.name;

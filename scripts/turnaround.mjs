@@ -15,13 +15,25 @@ if (!KEY) { console.error('FAL_API_KEY missing'); process.exit(1); }
 const SHEET = join(ROOT, 'generations', 't1-characters_nano-banana_1788152732763.jpg');
 const refUri = `data:image/jpeg;base64,${readFileSync(SHEET).toString('base64')}`;
 
+const FIGS = {
+  costermonger: 'ONLY the first figure from the reference (the costermonger: corduroy jacket ' +
+    'and trousers, striped waistcoat, bright red neckerchief, small flat cap, worn leather ' +
+    'boots, 1880s London street vendor)',
+  flowergirl: 'ONLY the second figure from the reference (the flower girl: patterned shawl ' +
+    'over a blouse, long apron over a striped skirt, small straw bonnet worn close to the ' +
+    'head, flat shoes, 1880s London street seller). NO basket, NO flowers',
+  constable: 'ONLY the third figure from the reference (the Victorian police constable: dark ' +
+    'blue high-collar tunic with two button rows, white belt with buckle, dark trousers, ' +
+    'black boots). IMPORTANT: replace the tall helmet with a small flat pillbox cap so the ' +
+    'head is compact',
+};
+const who = process.argv[2] || 'costermonger';
+if (!FIGS[who]) { console.error('unknown figure', who); process.exit(1); }
 const prompt =
-  'Character turnaround sheet of ONLY the first figure from the reference (the costermonger: ' +
-  'corduroy jacket and trousers, striped waistcoat, bright red neckerchief, small flat cap, ' +
-  'worn leather boots, 1880s London street vendor). One 16:9 image, exactly three full-body ' +
+  `Character turnaround sheet of ${FIGS[who]}. One 16:9 image, exactly three full-body ` +
   'views side by side: FRONT view, SIDE view facing left, BACK view. STRICT T-POSE in all ' +
   'three views: both arms straight out horizontally at shoulder height, clearly separated ' +
-  'from the body and the cap, legs straight and slightly apart. No basket, no props, no text, ' +
+  'from the body and any headwear, legs straight and slightly apart. No props, no text, ' +
   'no labels. Plain light-gray background, even flat lighting, consistent scale.';
 
 const submit = await fetch('https://queue.fal.run/fal-ai/nano-banana/edit', {
@@ -50,7 +62,7 @@ for (;;) {
 const url = result.images?.[0]?.url;
 if (!url) { console.error('no image url', JSON.stringify(result).slice(0, 500)); process.exit(1); }
 const stamp = Date.now();
-const base = `turnaround-costermonger_nano-banana_${stamp}`;
+const base = `turnaround-${who}_nano-banana_${stamp}`;
 writeFileSync(join(ROOT, 'generations', `${base}.jpg`), Buffer.from(await (await fetch(url)).arrayBuffer()));
 writeFileSync(join(ROOT, 'generations', `${base}.json`), JSON.stringify({
   prompt, model: 'fal-ai/nano-banana/edit', provider: 'fal',
