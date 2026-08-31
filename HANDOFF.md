@@ -24,6 +24,22 @@ quotes, or a judge loop that will not converge.
   + Idle(0)/Casual_Walk(30)/Run_02(14) clips in `meshy/costermonger/` (GLBs
   committed). NEXT: 2a builder batches (Blender headless → GLB), 2b Three.js
   integration (rig proof = measured joint motion through GLTFLoader).
+- **Stage 2b DONE** (tag `stage2b-character-playable`): costermonger in-game,
+  rig proven (24 bones, LeftFoot, 1.4 m foot swing measured). Camera occlusion in.
+- **Assembly ready** (commit 8689300): `sandbox/assets.js` swaps greybox for GLBs
+  at layout records when files appear in `sandbox/assets/models/`; shared PBR
+  materials bound BY NAME (brick/slate/planks/plaster/stone/iron/glass/...);
+  ground is cobbled. Builder GLB contract = briefs in `blender/briefs/`.
+- **Stage 5 skeleton DONE** (tag `stage5-mission-skeleton`): Costermonger's Round
+  mission (pickup + 3 deliveries + return, E-interact, ding, timer) unlocks after
+  the route tour; procedural footsteps; gate = 14 checks incl. mission drive.
+- **NPCs rigged**: `meshy/flowergirl/`, `meshy/constable/` (idle+walk GLBs).
+  Wander behaviour still to write (stage 5 polish).
+- **2a BLOCKED-RETRY**: builders B1-B3 (Blender headless per `blender/briefs/`)
+  died instantly at the account session limit (reset 12:10am PT 2026-08-31).
+  FIRST ACT on resume: respawn builder subagents B1, B2, B3 (+B4 when a slot
+  frees) with the prompts = their brief files; then judge rounds per
+  asset-judge-loop (fresh judge each round, min-score, parent-made inventory).
 
 ## What this project is
 A playable third-person 3D world: **1880s Victorian London, Whitechapel/Spitalfields**,
