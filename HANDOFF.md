@@ -22,7 +22,11 @@ then the specialist skill the current stage names.
     district, dimensions, materials, characters, sources).
 - **Budget:** fal.ai credit was $4.66; spent $0.47 (12 images, nano-banana);
   ≈ **$4.19 left**. Key: `FAL_API_KEY` in project `.env` (gitignored). No
-  KIE_API_KEY exists. Track spend; stop at the ceiling.
+  KIE_API_KEY exists (not needed — this project runs on fal). Track spend;
+  stop at the ceiling.
+- **Meshy: AUTHORIZED 2026-08-30.** the operator: 1408 credits, "feel free to use it
+  up." Use for stage 2 character/props (image→3D, rig, animate) as needed.
+  Free fallbacks stay valid: blender-headless procedural, Mixamo rigs.
 - Cross-model judges verified working this machine: `codex-sub` / `grok-sub`
   wrappers (remakebench plugin). Grok sandbox is a no-op on Windows — give grok
   a scratch `-C` dir. Details in auto-memory `grok-cli-headless-fix`.
