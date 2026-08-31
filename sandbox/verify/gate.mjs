@@ -1,0 +1,128 @@
+// verify-by-playing gate driver — stage 1 sandbox.
+// Real CDP input via Playwright (keyboard.down/up = held keys), telemetry is READ-ONLY.
+// Usage: node gate.mjs [--fault=deadkeys|seal|cam]  (fault runs must FAIL — red-test)
+// Headed browser: the sim runs on rAF and requires a visible pane (documented in index.html).
+import { chromium } from 'playwright';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const OUT = path.join(here, 'out');
+fs.mkdirSync(OUT, { recursive: true });
+const FAULT = (process.argv.find(a => a.startsWith('--fault=')) || '').split('=')[1] || null;
+const BASE = 'http://localhost:8123/';
+const ROUTE_TIMEOUT_MS = FAULT ? 25_000 : 300_000;
+
+const checks = [];
+function check(name, ok, detail) { checks.push({ name, ok, detail }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ' — ' + detail : ''}`); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ---- provenance: the server must be serving the current bytes on disk ----
+const disk = fs.readFileSync(path.join(here, '..', 'index.html'), 'utf8');
+const served = await (await fetch(BASE + 'index.html')).text();
+check('provenance: served bytes == disk bytes', served === disk);
+
+const browser = await chromium.launch({ headless: false,
+  args: ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'] });
+const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, recordVideo: FAULT ? undefined : { dir: OUT, size: { width: 1280, height: 720 } } });
+const page = await context.newPage();
+await page.goto(BASE + (FAULT ? `?fault=${FAULT}` : ''));
+await sleep(1200);
+const kb = page.keyboard;
+
+const g = () => page.evaluate(() => ({
+  x: __game.x, z: __game.z, yaw: __game.yaw, cp: __game.cp, cam: __game.activeCamera,
+  done: __game.routeDone, secs: __game.routeSeconds, frames: __game.fps ? __game.fps.frames : 0,
+  fpsMed: __game.fps ? __game.fps.median : null, downs: __probe.downs, ups: __probe.ups,
+  route: __game.route,
+}));
+
+// ---- proof 1: input-liveness (unbound key, press+release seen by the app) ----
+let s0 = await g();
+await kb.down('KeyX'); await sleep(80); await kb.up('KeyX'); await sleep(80);
+let s1 = await g();
+check('liveness: app saw unbound-key press+release', s1.downs === s0.downs + 1 && s1.ups === s0.ups + 1,
+  `downs ${s0.downs}->${s1.downs} ups ${s0.ups}->${s1.ups}`);
+
+// ---- proof 4a: verbs measured — walk speed, then sprint ~2x ----
+await kb.down('KeyW'); await sleep(1500); await kb.up('KeyW'); await sleep(120);
+let s2 = await g();
+const walkDist = Math.hypot(s2.x - s1.x, s2.z - s1.z);
+check('verb: W walk moved the player', walkDist > 3, `${walkDist.toFixed(1)} m in 1.5 s`);
+await kb.down('ShiftLeft'); await kb.down('KeyW'); await sleep(1500); await kb.up('KeyW'); await kb.up('ShiftLeft'); await sleep(120);
+let s3 = await g();
+const sprintDist = Math.hypot(s3.x - s2.x, s3.z - s2.z);
+check('verb: sprint ≈ 2x walk (measured)', sprintDist / Math.max(walkDist, 0.01) > 1.5 && sprintDist / Math.max(walkDist, 0.01) < 2.6,
+  `walk ${walkDist.toFixed(1)} m vs sprint ${sprintDist.toFixed(1)} m`);
+
+// ---- proof 4b: arrow-key camera changes yaw ----
+await kb.down('ArrowLeft'); await sleep(400); await kb.up('ArrowLeft'); await sleep(80);
+let s4 = await g();
+check('verb: arrow key turns the camera', Math.abs(s4.yaw - s3.yaw) > 0.3, `yaw ${s3.yaw.toFixed(2)} -> ${s4.yaw.toFixed(2)}`);
+
+// ---- proof 2: route traversal with REAL held keys, steering feedback loop ----
+const camSamples = new Set();
+let stuckEvents = 0;
+const t0 = Date.now();
+await kb.down('KeyW'); await kb.down('ShiftLeft');
+let lastPos = null, lastProgress = Date.now(), lastCp = -1, held = { L: false, R: false };
+let routeDone = false, routeSecs = null;
+while (Date.now() - t0 < ROUTE_TIMEOUT_MS) {
+  const s = await g();
+  camSamples.add(s.cam);
+  if (s.done) { routeDone = true; routeSecs = s.secs; break; }
+  const [cx, cz] = s.route[s.cp];
+  const dx = cx - s.x, dz = cz - s.z;
+  let err = Math.atan2(-dx, -dz) - s.yaw;
+  while (err > Math.PI) err -= 2 * Math.PI;
+  while (err < -Math.PI) err += 2 * Math.PI;
+  const wantL = err > 0.08, wantR = err < -0.08;
+  if (wantL !== held.L) { await (wantL ? kb.down('ArrowLeft') : kb.up('ArrowLeft')); held.L = wantL; }
+  if (wantR !== held.R) { await (wantR ? kb.down('ArrowRight') : kb.up('ArrowRight')); held.R = wantR; }
+  // big heading error: pause forward motion while turning
+  if (Math.abs(err) > 0.9) { await kb.up('KeyW'); } else { await kb.down('KeyW'); }
+  if (lastPos && Math.hypot(s.x - lastPos.x, s.z - lastPos.z) > 0.8) lastProgress = Date.now();
+  if (Date.now() - lastProgress > 4000) {   // wall-stuck: strafe wiggle, alternating side
+    stuckEvents++;
+    const side = stuckEvents % 2 ? 'KeyA' : 'KeyD';
+    await kb.down(side); await sleep(700); await kb.up(side);
+    lastProgress = Date.now();
+  }
+  if (s.cp !== lastCp) {
+    console.log(`  cp ${s.cp}/${s.route.length} reached, pos ${s.x.toFixed(0)},${s.z.toFixed(0)}, t+${((Date.now() - t0) / 1000).toFixed(0)}s`);
+    if (!FAULT && s.cp === 3) await page.screenshot({ path: path.join(OUT, 'cp3-market.png') });
+    if (!FAULT && s.cp === 9) await page.screenshot({ path: path.join(OUT, 'cp9-church.png') });
+    lastCp = s.cp;
+  }
+  lastPos = s;
+  await sleep(120);
+}
+for (const k of ['KeyW', 'ShiftLeft', 'ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD']) await kb.up(k);
+check('route: traversed end to end by walking', routeDone, routeDone ? `${routeSecs.toFixed(1)} s of play, ${stuckEvents} stuck-wiggles` : `stalled; last cp ${lastCp}`);
+if (!FAULT && routeDone) await page.screenshot({ path: path.join(OUT, 'route-complete.png') });
+
+// ---- proof 3: camera ownership across the whole session ----
+check('camera: gameplay camera owned every sampled frame', camSamples.size === 1 && camSamples.has('gameplay'),
+  `saw: ${[...camSamples].join(',') || 'none'}`);
+
+// ---- disarm: harness releases everything and the app still responds ----
+const d0 = await g();
+await sleep(500);
+const d1 = await g();
+check('disarm: frames still advancing', d1.frames > 0 && d1.fpsMed > 20, `median ${d1.fpsMed?.toFixed(0)} fps`);
+await kb.down('KeyX'); await sleep(60); await kb.up('KeyX'); await sleep(60);
+const d2 = await g();
+check('disarm: a fresh key still reaches the app', d2.downs === d1.downs + 1 && d2.ups === d1.ups + 1);
+await kb.down('KeyW'); await sleep(400); await kb.up('KeyW'); await sleep(100);
+const d3 = await g();
+check('disarm: player still walkable after harness', Math.hypot(d3.x - d2.x, d3.z - d2.z) > 0.8);
+
+await context.close();   // flushes the video
+await browser.close();
+const video = fs.readdirSync(OUT).find(f => f.endsWith('.webm'));
+if (!FAULT && video) console.log(`video: out/${video}`);
+
+const failed = checks.filter(c => !c.ok);
+console.log(`\n${checks.length - failed.length}/${checks.length} checks passed${FAULT ? ` (fault=${FAULT}: this run SHOULD fail)` : ''}`);
+process.exit(failed.length ? 1 : 0);
