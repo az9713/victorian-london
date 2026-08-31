@@ -1,0 +1,122 @@
+// Stage 2a/3 assembly: swap greybox visuals for delivered GLBs at the layout
+// records. Colliders are NOT touched — greybox AABBs stay the collision truth.
+// Missing GLBs are skipped silently (progressive upgrade as builders deliver).
+// Shared PBR materials are bound BY NAME from sandbox/assets/pbr/manifest.json;
+// builder GLBs carry material names only, no textures.
+
+const MODEL_BASE = 'assets/models/';
+
+// material name -> pbr set (null = flat color material stays as exported)
+const MAT_PBR = {
+  brick: 'brown_brick_02', slate: 'roof_slates_02', cobble: 'cobblestone_03',
+  planks: 'dark_wooden_planks', plaster: 'beige_wall_001', stone: 'beige_wall_001',
+};
+const MAT_FLAT = {   // color/rough/metal for non-textured names
+  iron:        { color: 0x2a2c2e, roughness: 0.55, metalness: 0.85 },
+  glass:       { color: 0x9fb4c0, roughness: 0.08, metalness: 0.0, transparent: true, opacity: 0.35 },
+  paint_dark:  { color: 0x25321f, roughness: 0.6 },
+  paint_green: { color: 0x2e4a34, roughness: 0.55 },
+  postbox_red: { color: 0x8a1c1c, roughness: 0.5 },
+  cloth:       { color: 0x8d8069, roughness: 0.95 },
+};
+
+export async function upgradeWorld({ THREE, GLTFLoader, scene, L, kindMeshes }) {
+  const loader = new GLTFLoader();
+  const tl = new THREE.TextureLoader();
+  const report = { placed: [], missing: [] };
+
+  // ---- shared materials ----
+  const pbrManifest = await (await fetch('assets/pbr/manifest.json')).json();
+  const shared = {};
+  const loadTex = (p, srgb) => { const t = tl.load('assets/pbr/' + p);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
+  for (const [name, slug] of Object.entries(MAT_PBR)) {
+    const set = pbrManifest[slug]; if (!set) continue;
+    shared[name] = new THREE.MeshStandardMaterial({
+      name, map: set.maps.diff && loadTex(set.maps.diff, true),
+      normalMap: set.maps.normal && loadTex(set.maps.normal),
+      roughnessMap: set.maps.rough && loadTex(set.maps.rough),
+      aoMap: set.maps.ao && loadTex(set.maps.ao),
+    });
+  }
+  for (const [name, def] of Object.entries(MAT_FLAT))
+    shared[name] = new THREE.MeshStandardMaterial({ name, ...def });
+
+  const bindMaterials = root => root.traverse(o => {
+    if (!o.isMesh) return;
+    const swap = m => shared[m.name?.toLowerCase().replace(/\.\d+$/, '')] ?? m;
+    o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);
+    if (o.geometry.attributes.uv && !o.geometry.attributes.uv2)
+      o.geometry.setAttribute('uv2', o.geometry.attributes.uv);   // aoMap needs uv2
+    o.castShadow = o.receiveShadow = true;
+  });
+
+  const tryLoad = url => new Promise(res =>
+    loader.load(MODEL_BASE + url, g => res(g), undefined, () => res(null)));
+
+  const removeKinds = (...kinds) => {
+    for (const k of kinds) for (const m of (kindMeshes[k] ?? [])) scene.remove(m);
+  };
+  const place = (glb, x, z, rotY = 0, scaleY = 1) => {
+    const inst = glb.scene.clone(true);
+    inst.position.set(x, 0, z); inst.rotation.y = rotY;
+    if (scaleY !== 1) inst.scale.y = scaleY;
+    bindMaterials(inst); scene.add(inst); return inst;
+  };
+
+  // ---- landmark placements (origins per the builder briefs) ----
+  const jobs = [
+    ['market.glb',  g => { removeKinds('market-wall', 'market-column', 'market-roof'); place(g, 234.5, 150); }],
+    ['church.glb',  g => { removeKinds('church-nave', 'church-tower', 'church-spire'); place(g, 24, 207.5); }],
+    ['ginpalace.glb', g => { removeKinds('ginpalace', 'ginpalace-front'); place(g, 76.5, 188); }],
+    ['rookery.glb', g => { removeKinds('rookery', 'rookery-wall'); place(g, 171.5, 166.25); }],
+    ['viaduct-module.glb', g => { removeKinds('viaduct-pier', 'viaduct-deck');
+      for (let cx = 2; cx <= 348; cx += 22) place(g, cx, 10); }],
+    ['gy-flank.glb', g => { removeKinds('gy-flank');
+      place(g, 144, 85.25, 0); place(g, 156, 85.25, Math.PI); }],
+    ['gaslamp.glb', g => { removeKinds('lamp');
+      for (const l of L.lamps) place(g, l.x, l.z); }],
+    ['pillarbox.glb', g => { removeKinds('pillarbox');
+      place(g, L.pillarbox.x, L.pillarbox.z); }],
+  ];
+  for (const [file, fn] of jobs) {
+    const g = await tryLoad(file);
+    if (g) { fn(g); report.placed.push(file); } else report.missing.push(file);
+  }
+
+  // ---- terraces: 6 module variants, rotated to face their street ----
+  const FACE_ROT = { '-z': 0, '+z': Math.PI, '+x': -Math.PI / 2, '-x': Math.PI / 2 };
+  const terraceGlbs = {};
+  for (const v of [0, 1, 2]) for (const s of [3, 4]) {
+    const g = await tryLoad(`terrace${v}-${s}.glb`);
+    if (g) terraceGlbs[`${v}-${s}`] = g; else report.missing.push(`terrace${v}-${s}.glb`);
+  }
+  if (Object.keys(terraceGlbs).length === 6) {
+    removeKinds('terrace0', 'terrace1', 'terrace2');
+    for (const b of L.boxes) {
+      const m = b.kind.match(/^terrace(\d)$/); if (!m) continue;
+      const h = b.y1, s = h < 12.5 ? 3 : 4, base = s === 3 ? 11.25 : 13.25;
+      const g = terraceGlbs[`${m[1]}-${s}`];
+      place(g, (b.x1 + b.x2) / 2, (b.z1 + b.z2) / 2, FACE_ROT[b.face] ?? 0, h / base);
+    }
+    report.placed.push('terraces x6');
+  }
+
+  // ---- ground: cobbles everywhere (PBR, declared scale) ----
+  if (shared.cobble && kindMeshes.ground?.[0]) {
+    const gmesh = kindMeshes.ground[0];
+    const matG = shared.cobble.clone();
+    const rx = L.bounds.x / (pbrManifest.cobblestone_03?.scale ?? 4);
+    const rz = L.bounds.z / (pbrManifest.cobblestone_03?.scale ?? 4);
+    for (const k of ['map', 'normalMap', 'roughnessMap', 'aoMap']) {
+      if (!matG[k]) continue;
+      matG[k] = matG[k].clone(); matG[k].repeat.set(rx, rz); matG[k].needsUpdate = true;
+    }
+    gmesh.geometry.setAttribute('uv2', gmesh.geometry.attributes.uv);
+    gmesh.material = matG;
+    report.placed.push('ground-cobbles');
+  }
+
+  console.log('upgradeWorld:', JSON.stringify(report));
+  return report;
+}

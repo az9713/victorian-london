@@ -45,24 +45,25 @@ export function buildLayout() {
   // fill terraces: frontage 5.00, parapets 10.50-14.00 (seeded, stable)
   let seed = 42;
   const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-  function terraces(axis, f1, f2, from, to, gaps) {
+  function terraces(axis, f1, f2, from, to, gaps, face) {   // face: which way fronts point
     for (let a = from; a + 5 <= to; a += 5) {
       if (gaps.some(g => a < g[1] && a + 5 > g[0])) { rnd(); rnd(); continue; }
       const h = 10.5 + rnd() * 3.5; const v = (rnd() * 3) | 0;   // v: facade variant 0..2
       if (axis === 'z') box('terrace' + v, f1, a, f2, a + 5, 0, h);
       else box('terrace' + v, a, f1, a + 5, f2, 0, h);
+      boxes[boxes.length - 1].face = face;
     }
   }
-  terraces('z', 37, 51, 26, 300, [[185, 230]]);
-  terraces('z', 69, 83, 26, 300, [[144.5, 155.5], [178, 198], [120, 180]]);
-  terraces('z', 270.5, 284.5, 26, 300, [[120, 180]]);
-  terraces('z', 295.5, 309.5, 26, 300, []);
-  terraces('x', 26, 40, 0, 350, [[51, 69], [140, 160], [284.5, 295.5]]);
-  terraces('x', 130.5, 144.5, 69, 140, []);
-  terraces('x', 130.5, 144.5, 160, 184.5, []);
-  terraces('x', 155.5, 169.5, 84, 152, []);
-  terraces('x', 106, 120, 184.5, 284.5, []);
-  terraces('x', 180, 194, 184.5, 284.5, [[190, 200]]);
+  terraces('z', 37, 51, 26, 300, [[185, 230]], '+x');            // faces Commercial St
+  terraces('z', 69, 83, 26, 300, [[144.5, 155.5], [178, 198], [120, 180]], '-x');
+  terraces('z', 270.5, 284.5, 26, 300, [[120, 180]], '+x');      // faces Brick Lane
+  terraces('z', 295.5, 309.5, 26, 300, [], '-x');
+  terraces('x', 26, 40, 0, 350, [[51, 69], [140, 160], [284.5, 295.5]], '-z'); // viaduct street
+  terraces('x', 130.5, 144.5, 69, 140, [], '+z');                // faces Dorset St
+  terraces('x', 130.5, 144.5, 160, 184.5, [], '+z');
+  terraces('x', 155.5, 169.5, 84, 152, [], '-z');
+  terraces('x', 106, 120, 184.5, 284.5, [], '+z');               // faces plaza
+  terraces('x', 180, 194, 184.5, 284.5, [[190, 200]], '-z');
 
   // invisible slice bounds
   for (const b of [[-2, -2, 352, 0], [-2, 300, 352, 302], [-2, -2, 0, 302], [350, -2, 352, 302]])
