@@ -35,11 +35,14 @@ quotes, or a judge loop that will not converge.
   the route tour; procedural footsteps; gate = 14 checks incl. mission drive.
 - **NPCs rigged**: `meshy/flowergirl/`, `meshy/constable/` (idle+walk GLBs).
   Wander behaviour still to write (stage 5 polish).
-- **2a BLOCKED-RETRY**: builders B1-B3 (Blender headless per `blender/briefs/`)
-  died instantly at the account session limit (reset 12:10am PT 2026-08-31).
-  FIRST ACT on resume: respawn builder subagents B1, B2, B3 (+B4 when a slot
-  frees) with the prompts = their brief files; then judge rounds per
-  asset-judge-loop (fresh judge each round, min-score, parent-made inventory).
+- **2a RUNNING** (04:30 2026-08-31): builders B1r/B2r/B3r respawned after the
+  session-limit reset (first spawn died instantly at the limit). B4 (terraces,
+  `blender/briefs/B4-terraces.md`) launches when a slot frees (≤3 concurrent).
+  Judge infra ready: judge prompt = asset-judge-loop references/judge-prompt.md
+  (slots: renders, manifest, inventory, refpack tiers, pass threshold 4);
+  parent-made inventory via `node scripts/glb_inventory.mjs`.
+- **NPCs + mission live** (tag `stage5-mission-skeleton`, commit 2199e80): gate
+  is 15 checks, all passing, incl. mission round + NPC motion (measured).
 
 ## What this project is
 A playable third-person 3D world: **1880s Victorian London, Whitechapel/Spitalfields**,
