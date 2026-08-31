@@ -1,0 +1,11 @@
+{
+  "prompt": "Neutral flat overcast daylight, technical illustration plate, muted colors, clean white margins, no dramatic lighting, no people unless stated. Architectural SITE PLAN, top-down orthographic, hand-drafted Victorian survey style on aged paper, of a 350m x 300m London district slice: a large market building with glass roof (rectangular, 100m x 60m plaza) center-east; a church with spire in a forecourt on the west side facing a main street; one main street running north-south on the west third (18m wide), a second north-south street on the east third (11m), one west-east street through the centre (11m); a narrow alley (4m) connecting the central street north to a railway viaduct that closes the full north edge; dense terraced housing blocks filling the rest, rear courtyards hatched; spot height marks +0.00 across the plan; north arrow; scale bar. Labels in period lettering.",
+  "model": "fal-ai/nano-banana",
+  "provider": "fal",
+  "refs": [],
+  "params": {
+    "aspect_ratio": "1:1"
+  },
+  "cost_usd": 0.039,
+  "created": "2026-08-31T05:02:39.397Z"
+}

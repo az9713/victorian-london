@@ -1,0 +1,11 @@
+{
+  "prompt": "Neutral flat overcast daylight, technical illustration plate, muted colors, clean white margins, no dramatic lighting, no people unless stated. CHARACTER SHEET lineup, 6 full-body figures side by side on plain background, neutral pose, 1880s London street types after Mayhew: costermonger (corduroy, bright neckerchief, cap), flower girl (shawl, straw bonnet, large basket), police constable (dark blue tunic, tall domed helmet), gentleman (black frock coat, top hat, watch chain), match girl (ragged child, bare feet, match bundle), chimney sweep (soot-black clothes, brushes). Each labelled beneath, consistent scale, muted colors.",
+  "model": "fal-ai/nano-banana",
+  "provider": "fal",
+  "refs": [],
+  "params": {
+    "aspect_ratio": "16:9"
+  },
+  "cost_usd": 0.039,
+  "created": "2026-08-31T05:05:34.181Z"
+}

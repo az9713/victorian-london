@@ -1,0 +1,11 @@
+{
+  "prompt": "Cinematic wide shot, 1880s Victorian London, Whitechapel street at night in dense brownish pea-souper fog. Wet granite setts reflecting warm orange-yellow gaslight pools from cast-iron street lamps spaced far apart, true darkness between them. Soot-blackened London stock brick terraces 3-4 storeys, a brightly gas-lit gin palace pub front with mirrored interior glow on the right, silhouette of Christ Church Spitalfields spire rising above rooftops in the fog behind. A few figures in period dress as dim silhouettes: a police constable, a flower girl. Hansom cab passing. Photorealistic, moody, high contrast, film still, no text, no watermark.",
+  "model": "fal-ai/nano-banana",
+  "provider": "fal",
+  "refs": [],
+  "params": {
+    "aspect_ratio": "16:9"
+  },
+  "cost_usd": 0.039,
+  "created": "2026-08-31T04:38:16.700Z"
+}

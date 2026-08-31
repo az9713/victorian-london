@@ -1,0 +1,11 @@
+{
+  "prompt": "Neutral flat overcast daylight, technical illustration plate, muted colors, clean white margins, no dramatic lighting, no people unless stated. Architectural LONGITUDINAL SECTION, west to east, hand-drafted Victorian style with printed dimension figures: level ground line marked +0.00 throughout; left: a church spire annotated +50.00 with nave +18.00; centre: 4-storey terraced houses annotated +14.50 parapet, floor-to-floor 3.50; right: market building glass roof ridge annotated +14.00, eaves +9.00; far background line: railway viaduct deck annotated +15.00 with arch opening 9.00 high; dimension lines, datum symbol, printed figures large and legible.",
+  "model": "fal-ai/nano-banana",
+  "provider": "fal",
+  "refs": [],
+  "params": {
+    "aspect_ratio": "16:9"
+  },
+  "cost_usd": 0.039,
+  "created": "2026-08-31T05:02:50.626Z"
+}

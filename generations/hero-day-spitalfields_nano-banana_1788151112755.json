@@ -1,0 +1,11 @@
+{
+  "prompt": "Cinematic wide shot, 1880s Victorian London, Spitalfields Market on a foggy grey morning. Glass-and-iron market roof with wrought iron arches, crowded open-air stalls with costermongers' barrows, flower girls with baskets, shoppers in period dress. Soot-blackened yellow-brown London stock brick buildings around the plaza, hand-painted white-on-dark shop fascia signs, a brick railway viaduct with round arches crossing in the background, thin fog softening the far end of the street. Muted palette, overcast daylight, photorealistic, film still, no text, no watermark.",
+  "model": "fal-ai/nano-banana",
+  "provider": "fal",
+  "refs": [],
+  "params": {
+    "aspect_ratio": "16:9"
+  },
+  "cost_usd": 0.039,
+  "created": "2026-08-31T04:38:35.569Z"
+}

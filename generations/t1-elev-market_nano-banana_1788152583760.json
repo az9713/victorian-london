@@ -1,0 +1,11 @@
+{
+  "prompt": "Neutral flat overcast daylight, technical illustration plate, muted colors, clean white margins, no dramatic lighting, no people unless stated. Orthographic front ELEVATION of an 1880s London market building: symmetrical glass-and-iron roof with wrought iron arches, ridge height annotated +14.00, eaves +9.00, soot-darkened yellow-brown London stock brick end pavilions, granite ground-floor columns, arched entrance, hand-drafted with dimension figures.",
+  "model": "fal-ai/nano-banana",
+  "provider": "fal",
+  "refs": [],
+  "params": {
+    "aspect_ratio": "16:9"
+  },
+  "cost_usd": 0.039,
+  "created": "2026-08-31T05:03:08.234Z"
+}

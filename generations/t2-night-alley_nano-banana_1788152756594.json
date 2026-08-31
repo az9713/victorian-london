@@ -1,0 +1,11 @@
+{
+  "prompt": "Photorealistic cinematic film still, 1880s Victorian London Whitechapel, muted palette, soot-blackened London stock brick, no text, no watermark. A 4-metre-wide alley at night between high dark brick walls, wet granite setts, one single gas lamp making a warm orange pool, dense brown fog beyond, distant silhouette of a woman with a basket, oppressive darkness at both ends.",
+  "model": "fal-ai/nano-banana",
+  "provider": "fal",
+  "refs": [],
+  "params": {
+    "aspect_ratio": "16:9"
+  },
+  "cost_usd": 0.039,
+  "created": "2026-08-31T05:06:00.039Z"
+}

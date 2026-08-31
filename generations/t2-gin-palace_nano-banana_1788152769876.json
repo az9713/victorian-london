@@ -1,0 +1,11 @@
+{
+  "prompt": "Photorealistic cinematic film still, 1880s Victorian London Whitechapel, muted palette, soot-blackened London stock brick, no text, no watermark. Evening, the glowing front of an ornate gin palace pub: big plate-glass windows blazing warm gaslight into a foggy street, engraved glass, dark green and gold fascia, mirrored bright interior with brass, working-class patrons at the door, wet pavement reflections, fog swallowing the street beyond.",
+  "model": "fal-ai/nano-banana",
+  "provider": "fal",
+  "refs": [],
+  "params": {
+    "aspect_ratio": "16:9"
+  },
+  "cost_usd": 0.039,
+  "created": "2026-08-31T05:06:10.690Z"
+}

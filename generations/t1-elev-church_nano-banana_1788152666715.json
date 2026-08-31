@@ -1,0 +1,11 @@
+{
+  "prompt": "Neutral flat overcast daylight, technical illustration plate, muted colors, clean white margins, no dramatic lighting, no people unless stated. Orthographic west front ELEVATION of an English Baroque-Gothic church in the manner of Christ Church Spitalfields: pale Portland stone, tall tower and broach spire annotated +50.00 total, portico with columns, nave roof +18.00, hand-drafted with dimension figures on aged paper.",
+  "model": "fal-ai/nano-banana",
+  "provider": "fal",
+  "refs": [],
+  "params": {
+    "aspect_ratio": "3:4"
+  },
+  "cost_usd": 0.039,
+  "created": "2026-08-31T05:04:28.261Z"
+}

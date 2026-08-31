@@ -1,0 +1,11 @@
+{
+  "prompt": "Neutral flat overcast daylight, technical illustration plate, muted colors, clean white margins, no dramatic lighting, no people unless stated. MATERIALS SHEET, grid of 9 labelled physical material swatches for 1880s Whitechapel: sooted London stock brick (dark brown-black over yellow), clean London stock brick, Portland stone (cream), welsh slate roof (blue-grey), granite setts (wet), cast iron (black, rust edges), dark green painted timber shopfront, gold leaf sign lettering on black, weathered advertising ghost sign on brick. Each swatch square, labelled beneath, flat light.",
+  "model": "fal-ai/nano-banana",
+  "provider": "fal",
+  "refs": [],
+  "params": {
+    "aspect_ratio": "1:1"
+  },
+  "cost_usd": 0.039,
+  "created": "2026-08-31T05:05:23.896Z"
+}
