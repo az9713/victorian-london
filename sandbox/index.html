@@ -29,10 +29,12 @@
 <div id="hint">WASD move · Shift sprint · drag / arrow keys camera · click for mouse-look</div>
 <div id="done">ROUTE COMPLETE</div>
 <script type="importmap">
-{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"}}
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+ "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}
 </script>
 <script type="module">
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { buildLayout } from './layout.js';
 
 const L = buildLayout();
@@ -118,13 +120,51 @@ if (FAULT==='seal') colliders.push({x1:284,z1:60,x2:296,z2:62});   // seals Bric
 const debugCamera = gameplayCamera.clone(); debugCamera.name='debug';
 debugCamera.position.set(175,120,150); debugCamera.lookAt(175,0,150);
 
-// ---------- player: capsule, third-person ----------
+// ---------- player: capsule collider + rigged costermonger visual (stage 2b) ----------
 const player = new THREE.Group();
 const capsule = new THREE.Mesh(new THREE.CapsuleGeometry(0.35,1.05,4,10), mat(0x2dd4bf));
 capsule.position.y = 0.875; player.add(capsule);
 player.position.set(L.spawn.x, 0, L.spawn.z);
 scene.add(player);
 const P = {r:0.35, walk:4.0, sprint:8.0, yaw:L.spawn.yaw, pitch:-0.25};
+
+// character: idle.glb is the base (skin + Idle clip); walk/run clips retarget onto it
+const char = { model:null, mixer:null, actions:{}, active:null, bones:0, footBone:null, heading:0 };
+{
+  const loader = new GLTFLoader();
+  const load = u => new Promise((res, rej) => loader.load(u, res, undefined, rej));
+  Promise.all(['assets/character/idle.glb','assets/character/walk.glb','assets/character/run.glb'].map(load))
+    .then(([idle, walk, run]) => {
+      const model = idle.scene;
+      // Meshy pivot is not at the feet: snap bounds bottom to y=0, then true height to 1.75
+      const bb = new THREE.Box3().setFromObject(model);
+      const h = bb.max.y - bb.min.y, s = 1.75 / h;
+      model.scale.setScalar(s);
+      bb.setFromObject(model);
+      model.position.y = -bb.min.y;
+      player.add(model);
+      capsule.visible = false;
+      char.model = model;
+      char.mixer = new THREE.AnimationMixer(model);
+      for (const [name, g] of [['idle', idle], ['walk', walk], ['run', run]]){
+        const clip = g.animations[0];
+        if (clip) { char.actions[name] = char.mixer.clipAction(clip); }
+      }
+      char.actions.idle?.play(); char.active = 'idle';
+      // rig read-back through the ACTUAL loader (name-mangling check) + a probe bone
+      model.traverse(o => { if (o.isBone){ char.bones++;
+        if (!char.footBone && /foot|Foot/.test(o.name)) char.footBone = o; }});
+      console.log('rig bones:', char.bones, 'foot bone:', char.footBone?.name);
+    })
+    .catch(e => console.error('character load failed, capsule stays:', e));
+}
+function setAnim(name){
+  if (char.active === name || !char.actions[name]) return;
+  const from = char.actions[char.active], to = char.actions[name];
+  to.reset().play();
+  if (from) from.crossFadeTo(to, 0.2, false);
+  char.active = name;
+}
 
 // ---------- input: held-key STATE (no auto-repeat), raw probe log ----------
 const keys = {};
@@ -176,6 +216,11 @@ window.__game = { get route(){return route.map(r=>[r[1],r[2]])},
   get cpName(){return cp<route.length?route[cp][0]:'DONE'},
   get routeDone(){return tDone!==null}, get routeSeconds(){return tDone?(tDone-tStart)/1000:null},
   get activeCamera(){return renderer.info.render.frame>0 ? _lastCam : 'none'},
+  get anim(){return char.model ? char.active : 'no-character'},
+  get rig(){ if(!char.model) return null;
+    const p = char.footBone ? char.footBone.getWorldPosition(new THREE.Vector3()) : null;
+    return { bones:char.bones, footBone:char.footBone?.name ?? null,
+             foot: p ? [p.x,p.y,p.z] : null }; },
   get fps(){ const s=[...frameTimes].sort((a,b)=>a-b); if(!s.length) return null;
     return { median:1000/s[(s.length/2)|0], p95low:1000/s[(s.length*0.95)|0], frames:s.length }; } };
 let _lastCam='none';
@@ -200,15 +245,24 @@ function tick(now){
   if(keys.KeyA){mx-=Math.cos(P.yaw);mz+=Math.sin(P.yaw)}
   if(keys.KeyD){mx+=Math.cos(P.yaw);mz-=Math.sin(P.yaw)}
   const len=Math.hypot(mx,mz);
+  const sprinting = keys.ShiftLeft||keys.ShiftRight;
   if(len>0){
-    const sp=(keys.ShiftLeft||keys.ShiftRight)?P.sprint:P.walk;
+    const sp=sprinting?P.sprint:P.walk;
     let nx=player.position.x+mx/len*sp*dt, nz=player.position.z+mz/len*sp*dt;
     [nx,nz]=collide(nx,nz);
     player.position.x=Math.max(0.4,Math.min(L.bounds.x-0.4,nx));
     player.position.z=Math.max(0.4,Math.min(L.bounds.z-0.4,nz));
-    capsule.rotation.y=Math.atan2(mx,mz);
+    // smooth-turn the visual toward the movement direction
+    const target=Math.atan2(mx,mz);
+    let dh=target-char.heading;
+    while(dh>Math.PI)dh-=2*Math.PI; while(dh<-Math.PI)dh+=2*Math.PI;
+    char.heading += dh*Math.min(1, 12*dt);
     if(tStart===null) tStart=performance.now();
   }
+  capsule.rotation.y=char.heading;
+  if(char.model) char.model.rotation.y=char.heading;
+  setAnim(len>0 ? (sprinting?'run':'walk') : 'idle');
+  if(char.mixer) char.mixer.update(dt);
 
   // checkpoints
   if(cp<route.length){

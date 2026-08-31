@@ -1,7 +1,29 @@
 # HANDOFF — resume point for victorian-london
 
 **Read this first each new session.** Local git repo, NO remote — commits are the
-durable record. Working tree clean at `34b5fef`.
+durable record.
+
+## ACTIVE GOAL (session-scoped, 2026-08-31): finish the playable game autonomously.
+Success = fully functional game, pleasant UX, verified by playing (CDP/Playwright/
+claude-in-chrome). Meshy spend authorized (1408 credits). Stop only for: video-gen
+quotes, or a judge loop that will not converge.
+
+## Stage log
+- **Stage 0 COMPLETE** (commit 34b5fef): refpack + congruence + operator-approved hero.
+- **Stage 1 COMPLETE + VERIFIED** (tags `stage1-sandbox-playable`, `stage1-verified`):
+  Three.js greybox sandbox (`sandbox/index.html` + `sandbox/layout.js` = single layout
+  source). Gate `sandbox/verify/gate.mjs`: 10/10 checks, real Playwright CDP held-key
+  input, full route walked, 3 fault-injection red-tests each fail correctly.
+  Independent reviewer subagent PASSED the evidence (2 rounds; round 1 failed on
+  never-framed viaduct/spire → fixed by capture, pitch clamp 1.3).
+  Serve: `python -m http.server 8123 -d sandbox`. Gate: `node verify/gate.mjs`.
+- **Stage 2c datum (greybox):** median 145 fps, p95 141, idle == sprint, 1280x720
+  dpr1, ANGLE D3D11 on Intel UHD iGPU (NOT the RTX 3050), Chrome/151. `datum.mjs`.
+- **Stage 2 IN FLIGHT** (commit 9f9b566): 5 Polyhaven 2K PBR sets in
+  `sandbox/assets/pbr/` (scales in manifest.json). Character 2b: rigged costermonger
+  + Idle(0)/Casual_Walk(30)/Run_02(14) clips in `meshy/costermonger/` (GLBs
+  committed). NEXT: 2a builder batches (Blender headless → GLB), 2b Three.js
+  integration (rig proof = measured joint motion through GLTFLoader).
 
 ## What this project is
 A playable third-person 3D world: **1880s Victorian London, Whitechapel/Spitalfields**,

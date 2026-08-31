@@ -61,6 +61,25 @@ await kb.down('ArrowLeft'); await sleep(400); await kb.up('ArrowLeft'); await sl
 let s4 = await g();
 check('verb: arrow key turns the camera', Math.abs(s4.yaw - s3.yaw) > 0.3, `yaw ${s3.yaw.toFixed(2)} -> ${s4.yaw.toFixed(2)}`);
 
+// ---- proof (2b): rig lives — loader read-back + MEASURED joint motion ----
+let rigInfo = null;
+for (let i = 0; i < 50; i++) { rigInfo = await page.evaluate(() => __game.rig); if (rigInfo) break; await sleep(300); }
+check('rig: character loaded through GLTFLoader', !!rigInfo && rigInfo.bones > 20,
+  rigInfo ? `${rigInfo.bones} bones, foot bone "${rigInfo.footBone}"` : 'not loaded');
+if (rigInfo) {
+  const rel = async () => { const r = await page.evaluate(() => ({ f: __game.rig.foot, x: __game.x, z: __game.z }));
+    return r.f ? [r.f[0] - r.x, r.f[1], r.f[2] - r.z] : null; };
+  const accum = async (n) => { let prev = await rel(), acc = 0;
+    for (let i = 0; i < n; i++) { await sleep(120); const c = await rel();
+      acc += Math.hypot(c[0] - prev[0], c[1] - prev[1], c[2] - prev[2]); prev = c; } return acc; };
+  const idleAcc = await accum(10);                      // baseline: idle sway only
+  await kb.down('KeyW');
+  const walkAcc = await accum(10);                      // legs must actually swing
+  await kb.up('KeyW'); await sleep(150);
+  check('rig: measured joint motion while walking', walkAcc > 0.4 && walkAcc > idleAcc * 1.5,
+    `foot swing ${walkAcc.toFixed(2)} m walking vs ${idleAcc.toFixed(2)} m idle`);
+}
+
 // ---- landmark evidence helpers: face a heading / tilt, with real arrow keys ----
 async function faceYaw(target) {
   for (let i = 0; i < 60; i++) {
