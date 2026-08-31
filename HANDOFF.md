@@ -67,6 +67,18 @@ quotes, or a judge loop that will not converge.
   Fable builders (-r3f) were spawned, then stopped minutes later for the
   budget rule. FRESH SONNET builders `builder-B1-r3s` and `builder-B3-r3s`
   now run the fixlist files.
+- **16:50 PT update:** B1-r3s DIED (connection lost) mid-gable-hunt; it left
+  market_interior.png + market_gable.png (16:05), a market.glb re-export,
+  uncommitted market.blend edits, and NO sacks/stall/barrel progress beyond
+  what -r3f left. Replacement `builder-B1-r3t` (sonnet) now runs with exact
+  disk state + the gable decision ladder: (a) use existing interior/gable
+  frame if it evidences the screen, (b) one interior backlit camera try,
+  (c) scoped geometry exception — mullion depth and/or truss moved off the
+  gable plane, nothing else on market. B3-r3s confirmed sole B3 owner at
+  ~15:57 (the 15:45-15:51 mtimes were stopped -r3f work, no race) and is
+  building: inherited gaslamp+gy-flank done-ish (but gy-flank_34 white-out
+  and missing vent-louvre shot are on its list), rookery partial, viaduct
+  untouched, manifest stale.
   Known partial r3 work in the tree: commit 6ccdf44 exported sacks/stall/
   barrel/rookery GLBs at 14:48, but renders (~11:05) + manifests are stale
   and sacks has NO current renders. Builders were told to finish, re-export,
