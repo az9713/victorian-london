@@ -43,18 +43,20 @@ quotes, or a judge loop that will not converge.
   parent-made inventory via `node scripts/glb_inventory.mjs`.
 - **NPCs + mission live** (tag `stage5-mission-skeleton`, commit 2199e80): gate
   is 15 checks, all passing, incl. mission round + NPC motion (measured).
-- **2a judge loops (as of 2026-08-31 11:05 PT):** B4 PASSED r2 (tag
-  `2a-terraces-pass`), B2 PASSED r2 (tag `2a-church-ginpalace-pass`).
-  B1 r2 FAIL min 2 (market 4, crate 4, barrel 3, stall 3, sacks 2) — r3 fix
-  list routed (sacks cloth rebuild w/ tri budget, stall tie-wraps + peg frame,
-  barrel detail re-aim + de-spike, market gable close-up). B3 r2 FAIL min 3
-  (pillarbox 4, rest 3) — r3 list routed (viaduct springing hole + ring order,
-  rookery boarding + black dots, gaslamp floor blob + louvres, gy-flank
-  reshoots). BOTH builders (B1r, B3r) died at session limit mid-r3; RESETS
-  2:10pm PT — on wake, SendMessage both to resume (their fix lists are in
-  their inboxes; B1r was reframing the gable shot, B3r trimming architrave
-  corners). Judges are always FRESH per round. Full assembled game passes the
-  15/15 gate with round-2 assets (48 fps median).
+- **2a judge loops (as of 2026-08-31 11:20 PT):** B4 PASSED (tag
+  `2a-terraces-pass`), B2 PASSED (tag `2a-church-ginpalace-pass`).
+  B1 and B3 are mid ROUND 3; their full fix lists are ON DISK at
+  `blender/fixlists/B1-r3.md` and `blender/fixlists/B3-r3.md` (give to a
+  builder verbatim; each file also names exactly where the last builder
+  stopped). Trajectories: B1 min 1→2 (sacks is the blocker, 3rd round — hand
+  to a FRESH builder if it fails again); B3 min 2→3 (coincident-face black-
+  cavity bug class; zero pure black allowed). Judges are always FRESH per
+  round: prompt = asset-judge-loop references/judge-prompt.md with renders +
+  manifest + `node scripts/glb_inventory.mjs` output + refpack tier rules +
+  threshold 4. The assembled game passes the 15/15 gate with current assets
+  (48 fps median). Builder session limits reset 2:10pm PT 2026-08-31; if the
+  r-builders are dead, spawn NEW builder agents pointed at the fixlist files
+  (BRIEF-COMMON.md + their batch brief + fixlist is a complete work order).
 
 ## What this project is
 A playable third-person 3D world: **1880s Victorian London, Whitechapel/Spitalfields**,
@@ -84,7 +86,19 @@ then the specialist skill the current stage names.
   wrappers (remakebench plugin). Grok sandbox is a no-op on Windows — give grok
   a scratch `-C` dir. Details in auto-memory `grok-cli-headless-fix`.
 
-## Next task
+## Next task (updated 2026-08-31 — supersedes the stage-1 text below)
+- **Finish the two open judge loops** (B1, B3) per the fixlist files above,
+  then re-run the gate (`node sandbox/verify/gate.mjs`, server:
+  `python -m http.server 8123 -d sandbox`) and commit+tag `2a-complete`.
+- **Then stage 3 assembly judge + lookdev:** known items — brick texel scale
+  reads oversized/monotone in-game (assets.js binds PBR by material name; tune
+  repeat or swap set), roofline clutter on terraces seen from Brick Lane,
+  soot-darkening/grade AFTER geometry passes. Then stage 4 (fog/ambience),
+  stage 5 feel polish, stage 6 ship gate (clean perf re-take on quiet machine,
+  HANDOVER.md, final tag). Session goal active: complete the playable game
+  autonomously; verify by playing (Playwright CDP gate + independent judges).
+
+## Original stage-1 next-task (DONE — kept for context)
 - **Stage 1 — playable sandbox.** Engine decision recommended and accepted by
   default: **Three.js in the browser** (verify via claude-in-chrome; rAF perf).
   Build: capsule third-person player (WASD + mouse orbit), greybox the 350×300 m
