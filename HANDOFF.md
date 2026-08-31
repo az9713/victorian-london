@@ -57,6 +57,17 @@ quotes, or a judge loop that will not converge.
   (48 fps median). Builder session limits reset 2:10pm PT 2026-08-31; if the
   r-builders are dead, spawn NEW builder agents pointed at the fixlist files
   (BRIEF-COMMON.md + their batch brief + fixlist is a complete work order).
+- **Resume 15:0x PT 2026-08-31 (post-/clear):** B1r/B3r were limit-killed
+  mid-r3 and are hard-stopped via TaskStop (do not message them). FRESH
+  builders `builder-B1-r3f` and `builder-B3-r3f` now run the fixlist files.
+  Known partial r3 work in the tree: commit 6ccdf44 exported sacks/stall/
+  barrel/rookery GLBs at 14:48, but renders (~11:05) + manifests are stale
+  and sacks has NO current renders. Builders were told to finish, re-export,
+  re-render with clean provenance, update manifests. On each "done": parent
+  runs `node scripts/glb_inventory.mjs`, mtime-checks renders vs sources,
+  spawns FRESH judges judge-B1-r3 / judge-B3-r3 (threshold 4, min-score).
+  Sacks conditional: if the cloth read fails r3, round 4 goes to a different
+  fresh builder. Both pass → gate → commit → tag `2a-complete` → stage 3.
 
 ## What this project is
 A playable third-person 3D world: **1880s Victorian London, Whitechapel/Spitalfields**,
