@@ -61,6 +61,37 @@ await kb.down('ArrowLeft'); await sleep(400); await kb.up('ArrowLeft'); await sl
 let s4 = await g();
 check('verb: arrow key turns the camera', Math.abs(s4.yaw - s3.yaw) > 0.3, `yaw ${s3.yaw.toFixed(2)} -> ${s4.yaw.toFixed(2)}`);
 
+// ---- landmark evidence helpers: face a heading / tilt, with real arrow keys ----
+async function faceYaw(target) {
+  for (let i = 0; i < 60; i++) {
+    const s = await g();
+    let err = target - s.yaw;
+    while (err > Math.PI) err -= 2 * Math.PI;
+    while (err < -Math.PI) err += 2 * Math.PI;
+    if (Math.abs(err) < 0.1) break;
+    const k = err > 0 ? 'ArrowLeft' : 'ArrowRight';
+    await kb.down(k); await sleep(90); await kb.up(k);
+  }
+}
+async function tiltTo(target) {
+  for (let i = 0; i < 40; i++) {
+    const p = await page.evaluate(() => __game.pitch);
+    if (Math.abs(p - target) < 0.1) break;
+    const k = target > p ? 'ArrowUp' : 'ArrowDown';
+    await kb.down(k); await sleep(90); await kb.up(k);
+  }
+}
+
+// ---- landmark evidence 1: turn round at the north end — the viaduct closes the slice ----
+if (!FAULT) {
+  await faceYaw(0);                       // face north
+  await tiltTo(0.1);
+  await sleep(300);
+  await page.screenshot({ path: path.join(OUT, 'viaduct-north.png') });
+  await faceYaw(Math.PI);                 // back to south
+  await tiltTo(-0.25);
+}
+
 // ---- proof 2: route traversal with REAL held keys, steering feedback loop ----
 const camSamples = new Set();
 let stuckEvents = 0;
@@ -92,7 +123,17 @@ while (Date.now() - t0 < ROUTE_TIMEOUT_MS) {
   if (s.cp !== lastCp) {
     console.log(`  cp ${s.cp}/${s.route.length} reached, pos ${s.x.toFixed(0)},${s.z.toFixed(0)}, t+${((Date.now() - t0) / 1000).toFixed(0)}s`);
     if (!FAULT && s.cp === 3) await page.screenshot({ path: path.join(OUT, 'cp3-market.png') });
-    if (!FAULT && s.cp === 9) await page.screenshot({ path: path.join(OUT, 'cp9-church.png') });
+    if (!FAULT && s.cp === 9) {           // church forecourt: face the front, tilt up to the spire top
+      for (const k of ['KeyW', 'ShiftLeft', 'ArrowLeft', 'ArrowRight']) await kb.up(k);
+      held = { L: false, R: false };
+      await faceYaw(Math.PI / 2);         // face west
+      await tiltTo(1.25);
+      await sleep(300);
+      await page.screenshot({ path: path.join(OUT, 'church-spire.png') });
+      await tiltTo(-0.25);
+      await kb.down('KeyW'); await kb.down('ShiftLeft');
+      lastProgress = Date.now();          // the photo stop is not a stuck event
+    }
     lastCp = s.cp;
   }
   lastPos = s;
