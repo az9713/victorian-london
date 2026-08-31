@@ -21,7 +21,9 @@ the chimney line is the skyline). Walls meet ground at a plinth. Victorian brick
 soot-darkened London stock.
 
 ## Machine + tools
-- Blender: "C:\Program Files\Blender Foundation\Blender 4.4\blender.exe" -b -P script.py
+- Blender: "C:\Users\USERNAME\tools\blender-4.4.2-windows-x64\blender.exe" -b -P script.py
+  (portable 4.4.2 — verified headless 2026-08-31; the Program Files path is dead
+  and the Store alias is untrustworthy headless. Do not use either.)
   Always -t 4. Prefer bpy.data over bpy.ops (many ops fail headless).
 - You own your batch folder blender/<batch>/ (scripts, .blend) — touch nothing else
   except your exports and renders. One .blend per batch, or per asset.

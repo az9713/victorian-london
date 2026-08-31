@@ -1,6 +1,6 @@
 # Batch B3 — rookery, viaduct module, George Yard flank, gas lamp, pillar box
 Read blender/BRIEF-COMMON.md first. You own blender/B3/.
-Plates: refpack/tier1/long-section.jpg, refpack/tier2/viaduct-street.jpg,
+Plates: refpack/tier1/long-section.jpg, refpack/tier2/viaduct.jpg,
 refpack/tier2/night-alley.jpg (look only). Figures below are law.
 
 ## Asset 1: rookery (L5) — sandbox/assets/models/rookery.glb
