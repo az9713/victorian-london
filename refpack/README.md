@@ -71,7 +71,9 @@ crosses, on the north edge, perpendicular to both.
   CONTRADICTION: viaduct arch span printed 14.00 — README says **18.00**, README
   wins. One garbled parapet figure near the terrace roof: ignore.
 - **elev-market.jpg:** +14.00 ridge, +9.00 eaves correct. Imperial figures
-  (12'6", 45'0") decorative.
+  (12'6", 45'0") decorative. RULING 2026-08-31 (stage-2a judge finding): the
+  plate's printed 45'0" centre opening contradicts this README's 12.00 m
+  entrances; the README wins — entrances are 12.00 m.
 - **elev-street.jpg:** gin palace present mid-strip, 3 storeys, +14.00 and +3.50
   printed correct; other figures partly garbled — decorative. Pub name on plate is
   decorative.
