@@ -39,6 +39,10 @@ const g = () => page.evaluate(() => ({
 }));
 
 // ---- proof 1: input-liveness (unbound key, press+release seen by the app) ----
+for (let i = 0; i < 60; i++) {            // wait for the asset upgrade to finish loading
+  const w = await page.evaluate(() => __game.world);
+  if (w) break; await sleep(500);
+}
 await sleep(2500);                        // let texture upload / first-frame jank settle
 let s0 = await g();
 await kb.down('KeyX'); await sleep(80); await kb.up('KeyX'); await sleep(80);
