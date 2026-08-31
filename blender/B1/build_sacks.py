@@ -30,21 +30,21 @@ from common import (
 CLOTH = 0
 MAT_NAMES = ["cloth"]
 
-N_SEG = 28
-N_RING_BODY = 26
-N_RING_NECK = 12
+N_SEG = 36
+N_RING_BODY = 18
+N_RING_NECK = 8
 
 HALF_W = 0.19
 HALF_H_TOP = 0.145
-HALF_H_BOT = 0.065
+HALF_H_BOT = 0.085
 BODY_LEN = 0.68
 NECK_FRAC = 0.34
-NECK_RUN = 0.11
-NECK_LATERAL = 0.17
-NECK_RISE = 0.15
-NECK_DROOP = 0.08
+NECK_RUN = 0.30
+NECK_LATERAL = 0.22
+NECK_RISE = 0.20
+NECK_DROOP = 0.10
 NECK_MIN_R = 0.016
-SPREAD = 1.30
+SPREAD = 1.20
 ENV_FLOOR = 0.05
 COLLAR_PROUD = 0.010
 COLLAR_HALF_T = 0.006
@@ -52,7 +52,7 @@ COLLAR_HALF_T = 0.006
 # (t_center, t_width, amount) -- fold constrictions along the body, full
 # effect on the TOP half of the ring, damped on the underside so they read
 # as slack cloth folds, not a string of sausage links.
-FOLDS = [(0.30, 0.09, 0.16), (0.58, 0.08, 0.13)]
+FOLDS = []
 
 
 def ring_profile(t):
@@ -83,14 +83,21 @@ def ring_profile(t):
             rad_mult = 1.0 - p * 0.85          # taper down to the pinch (tie point)
         elif tn < 0.65:
             p = (tn - 0.40) / 0.25
-            rad_mult = 0.15 + p * 0.55          # bulge back out -- gathered ear base
+            rad_mult = 0.15 + p * 0.35          # bulge back out -- gathered ear base
         else:
             p = (tn - 0.65) / 0.35
-            rad_mult = 0.70 - p * 0.55          # taper to the ear's rounded tip
+            rad_mult = 0.50 - p * 0.36          # taper to the ear's rounded tip
         rad_mult = max(rad_mult, 0.12)
-        width_r = HALF_W * 0.45 * rad_mult + NECK_MIN_R
-        h_top = HALF_H_TOP * 0.45 * rad_mult + NECK_MIN_R * 0.9
-        h_bot = h_top
+        # max(), not +floor -- an always-added floor is discontinuous with
+        # the body's un-floored value right at tn=0 (the shoulder seam).
+        width_r = max(HALF_W * 0.45 * rad_mult, NECK_MIN_R)
+        h_top = max(HALF_H_TOP * 0.45 * rad_mult, NECK_MIN_R * 0.9)
+        # h_bot starts at the body's flattened ratio (continuous with the
+        # shoulder, no jump) and rounds out to match h_top by tn=0.30 -- an
+        # instant jump here flared the tube right at the shoulder seam.
+        flat_ratio = HALF_H_BOT / HALF_H_TOP
+        round_out = min(tn / 0.30, 1.0)
+        h_bot = h_top * (flat_ratio + (1.0 - flat_ratio) * round_out)
         bend_w = tn * NECK_LATERAL
         if tn < 0.65:
             bend_z = (tn / 0.65) * NECK_RISE
@@ -121,7 +128,9 @@ def build_sack(bm, cx, cy, s, body_deg, tail_z0=None, sag=0.0,
     collar_ts = [t_pinch - COLLAR_HALF_T, t_pinch + COLLAR_HALF_T]
     ts = sorted(set(ts) | set(collar_ts))
 
-    rings = []
+    # Pass 1: centerline position + base cross-section radii per ring.
+    centers = []
+    radii = []
     for t in ts:
         is_collar = any(abs(t - ct) < 1e-9 for ct in collar_ts)
         u, bend_w, bend_z, width_r, h_top, h_bot = ring_profile(t if not is_collar else t_pinch)
@@ -133,7 +142,36 @@ def build_sack(bm, cx, cy, s, body_deg, tail_z0=None, sag=0.0,
         ring_cx = cx + Lx * (u * s) + Wx * (bend_w * s)
         ring_cy = cy + Ly * (u * s) + Wy * (bend_w * s)
         ring_cz = tail_z0 + bend_z * s
+        centers.append(mathutils.Vector((ring_cx, ring_cy, ring_cz)))
+        radii.append((t, is_collar, width_r, h_top, h_bot))
 
+    # Pass 2: build each ring's cross-section using a TANGENT-FOLLOWING frame,
+    # not the fixed L/W/Z axes. The neck bends sharply enough (sideways +
+    # upward, off-axis per the brief) that a fixed cross-section basis shears
+    # into a corkscrew/stacked-disc look instead of a smooth taper; a frame
+    # that rotates with the centerline avoids that regardless of bend angle.
+    n = len(ts)
+    rings = []
+    for i in range(n):
+        t, is_collar, width_r, h_top, h_bot = radii[i]
+        if i == 0:
+            tangent = centers[1] - centers[0]
+        elif i == n - 1:
+            tangent = centers[i] - centers[i - 1]
+        else:
+            tangent = centers[i + 1] - centers[i - 1]
+        if tangent.length < 1e-9:
+            tangent = mathutils.Vector((Lx, Ly, 0.0))
+        tangent.normalize()
+        up_ref = mathutils.Vector((0.0, 0.0, 1.0))
+        if abs(tangent.dot(up_ref)) > 0.97:
+            up_ref = mathutils.Vector((Wx, Wy, 0.0))
+        local_u = up_ref.cross(tangent)
+        local_u.normalize()
+        local_v = tangent.cross(local_u)
+        local_v.normalize()
+
+        ring_center = centers[i]
         ring_verts = []
         for k in range(N_SEG):
             a = 2 * math.pi * k / N_SEG
@@ -157,10 +195,8 @@ def build_sack(bm, cx, cy, s, body_deg, tail_z0=None, sag=0.0,
                     mult *= 1 - damt * g
             local_w = width_r * s * wscale * mult
             local_h = hr * s * mult
-            x = ring_cx + Wx * (local_w * ca)
-            y = ring_cy + Wy * (local_w * ca)
-            z = ring_cz + local_h * sa
-            ring_verts.append(bm.verts.new((x, y, z)))
+            pos = ring_center + local_u * (local_w * ca) + local_v * (local_h * sa)
+            ring_verts.append(bm.verts.new((pos.x, pos.y, pos.z)))
         rings.append(ring_verts)
 
     for i in range(len(rings) - 1):
@@ -194,8 +230,8 @@ def build():
     # both of them -- raised tail_z0, sagging mid-body, stiffer/more spread
     # underside (it settles onto lumpy neighbours, not flat ground).
     s1, s2, s3 = 1.00, 0.82, 0.60
-    c1 = (-0.16, -0.04)
-    c2 = (0.19, 0.09)
+    c1 = (-0.32, -0.13)
+    c2 = (0.35, 0.17)
     top1 = HALF_H_BOT * s1 + HALF_H_TOP * s1
     top2 = HALF_H_BOT * s2 + HALF_H_TOP * s2
 

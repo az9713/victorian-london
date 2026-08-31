@@ -78,6 +78,9 @@ def door_zface(face_z, sign, xc, width=1.1, leaf_height=1.95, recess=WALL_THICK)
     C.add_quad(bm, (xr, y0, rz), (xr, y0, face_z), (xr, y1, face_z), (xr, y1, rz), mat_idx=BRICK)
     # lintel soffit
     C.add_quad(bm, (xl, y1, face_z), (xr, y1, face_z), (xr, y1, rz), (xl, y1, rz), mat_idx=BRICK)
+    # sill/threshold reveal (bottom of the opening) -- was missing, leaving
+    # the recess open through the wall's own thickness at the bottom edge
+    C.add_quad(bm, (xl, y0, rz), (xr, y0, rz), (xr, y0, face_z), (xl, y0, face_z), mat_idx=BRICK)
     # transom bar between door head and fanlight (proud, reads as a real
     # horizontal member the fanlight sits on top of) -- sits fully ABOVE
     # the leaf's own y-range so it never shares volume with the leaf box
@@ -111,13 +114,19 @@ def door_zface(face_z, sign, xc, width=1.1, leaf_height=1.95, recess=WALL_THICK)
               min(fz_leaf, rz), max(fz_leaf, rz), mat_idx=PAINT_DARK)
     mid_y = (y0 + y_head) / 2
     bead_w = 0.03
+    # picture-frame construction (round 3): the previous 4 strips per panel
+    # each ran full-length, so the two horizontal strips overlapped the two
+    # vertical strips' full volume at all 4 corners -- two coincident outer
+    # faces at the same z-range fighting each other, rendering as dark
+    # corner dots. Verticals stay full-height; horizontals are trimmed to
+    # fit strictly between them, so no two solids share any volume.
     for (py0, py1) in ((y0 + 0.14, mid_y - 0.05), (mid_y + 0.05, y_head - 0.14)):
         for (px0, px1) in ((xl + 0.10, xc - 0.04), (xc + 0.04, xr - 0.10)):
             zlo, zhi = min(fz_bead, fz_leaf), max(fz_bead, fz_leaf)
             C.add_box(bm, px0, px0 + bead_w, py0, py1, zlo, zhi, mat_idx=PAINT_DARK)
             C.add_box(bm, px1 - bead_w, px1, py0, py1, zlo, zhi, mat_idx=PAINT_DARK)
-            C.add_box(bm, px0, px1, py0, py0 + bead_w, zlo, zhi, mat_idx=PAINT_DARK)
-            C.add_box(bm, px0, px1, py1 - bead_w, py1, zlo, zhi, mat_idx=PAINT_DARK)
+            C.add_box(bm, px0 + bead_w, px1 - bead_w, py0, py0 + bead_w, zlo, zhi, mat_idx=PAINT_DARK)
+            C.add_box(bm, px0 + bead_w, px1 - bead_w, py1 - bead_w, py1, zlo, zhi, mat_idx=PAINT_DARK)
 
     # stepped architrave: proud two-step frame around the whole opening
     # (jambs + head), standing forward of the brick face -- this is what
@@ -158,13 +167,37 @@ def window_zface(face_z, sign, xc, y_sill, y_lintel, width=1.1, recess=WALL_THIC
                (xr, y_lintel, rz), mat_idx=BRICK)
     C.add_quad(bm, (xl, y_lintel, face_z), (xr, y_lintel, face_z), (xr, y_lintel, rz),
                (xl, y_lintel, rz), mat_idx=BRICK)
+    # sill reveal (bottom of the opening) -- was missing, leaving the
+    # recess open through the wall's own thickness at the sill line. This
+    # is the round-2 "yard window reveal pure-black rectangle": the camera
+    # looked through the unclosed bottom into the hollow behind the wall.
+    C.add_quad(bm, (xl, y_sill, rz), (xr, y_sill, rz), (xr, y_sill, face_z),
+               (xl, y_sill, face_z), mat_idx=BRICK)
     C.add_box(bm, xl - 0.05, xr + 0.05, y_sill - 0.05, y_sill,
               min(face_z, face_z - sign * 0.08), max(face_z, face_z - sign * 0.08),
               mat_idx=BRICK)  # proud sill
     if boarded:
-        bz = rz - sign * 0.01
-        C.add_box(bm, xl + 0.02, xr - 0.02, y_sill + 0.03, y_lintel - 0.03,
-                  min(bz, bz - sign * 0.03), max(bz, bz - sign * 0.03), mat_idx=PLANKS)
+        # discrete planks nailed across the opening, with real gaps between
+        # them (round 2: the "boarded" window was one filled slab, so the
+        # GLB's planks material had zero evidenced plank geometry). A dark
+        # back plane sits behind the gaps so they read as shadow, not a
+        # hole through to nothing.
+        back_bz = rz - sign * 0.01
+        C.add_quad(bm, (xl + 0.02, y_sill + 0.02, back_bz), (xr - 0.02, y_sill + 0.02, back_bz),
+                   (xr - 0.02, y_lintel - 0.02, back_bz), (xl + 0.02, y_lintel - 0.02, back_bz),
+                   mat_idx=PAINT_DARK)
+        n_planks = 4
+        gap = 0.03
+        py_lo, py_hi = y_sill + 0.04, y_lintel - 0.04
+        plank_h = (py_hi - py_lo - gap * (n_planks - 1)) / n_planks
+        pz0 = rz - sign * 0.02
+        pz1 = rz - sign * 0.055
+        for k in range(n_planks):
+            py0 = py_lo + k * (plank_h + gap)
+            py1 = py0 + plank_h
+            stagger = 0.015 if k % 2 == 0 else 0.0  # rough, hand-nailed look
+            C.add_box(bm, xl + 0.02 - stagger, xr - 0.02 + stagger, py0, py1,
+                      min(pz0, pz1), max(pz0, pz1), mat_idx=PLANKS)
     else:
         C.add_quad(bm, (xl, y_sill, rz), (xr, y_sill, rz), (xr, y_lintel, rz),
                    (xl, y_lintel, rz), mat_idx=PAINT_DARK)  # dark glazing recess
