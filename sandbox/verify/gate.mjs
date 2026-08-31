@@ -39,6 +39,7 @@ const g = () => page.evaluate(() => ({
 }));
 
 // ---- proof 1: input-liveness (unbound key, press+release seen by the app) ----
+await sleep(2500);                        // let texture upload / first-frame jank settle
 let s0 = await g();
 await kb.down('KeyX'); await sleep(80); await kb.up('KeyX'); await sleep(80);
 let s1 = await g();
@@ -169,6 +170,59 @@ while (Date.now() - t0 < ROUTE_TIMEOUT_MS) {
 for (const k of ['KeyW', 'ShiftLeft', 'ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD']) await kb.up(k);
 check('route: traversed end to end by walking', routeDone, routeDone ? `${routeSecs.toFixed(1)} s of play, ${stuckEvents} stuck-wiggles` : `stalled; last cp ${lastCp}`);
 if (!FAULT && routeDone) await page.screenshot({ path: path.join(OUT, 'route-complete.png') });
+
+// ---- proof (5): the Costermonger's Round — every mission verb pressed for real ----
+if (routeDone) {
+  const drive = async (tx, tz, tol, timeoutMs) => {
+    const t0 = Date.now();
+    await kb.down('KeyW'); await kb.down('ShiftLeft');
+    let heldD = { L: false, R: false }, lastP = null, lastProg = Date.now(), wig = 0;
+    let arrived = false;
+    while (Date.now() - t0 < timeoutMs) {
+      const s = await g();
+      camSamples.add(s.cam);
+      if (Math.hypot(s.x - tx, s.z - tz) < tol) { arrived = true; break; }
+      let err = Math.atan2(-(tx - s.x), -(tz - s.z)) - s.yaw;
+      while (err > Math.PI) err -= 2 * Math.PI;
+      while (err < -Math.PI) err += 2 * Math.PI;
+      const wL = err > 0.08, wR = err < -0.08;
+      if (wL !== heldD.L) { await (wL ? kb.down('ArrowLeft') : kb.up('ArrowLeft')); heldD.L = wL; }
+      if (wR !== heldD.R) { await (wR ? kb.down('ArrowRight') : kb.up('ArrowRight')); heldD.R = wR; }
+      if (Math.abs(err) > 0.9) await kb.up('KeyW'); else await kb.down('KeyW');
+      if (lastP && Math.hypot(s.x - lastP.x, s.z - lastP.z) > 0.8) lastProg = Date.now();
+      if (Date.now() - lastProg > 3500) {
+        const side = ++wig % 2 ? 'KeyA' : 'KeyD';
+        await kb.down(side); await sleep(700); await kb.up(side);
+        lastProg = Date.now();
+      }
+      lastP = s;
+      await sleep(120);
+    }
+    for (const k of ['KeyW', 'ShiftLeft', 'ArrowLeft', 'ArrowRight']) await kb.up(k);
+    return arrived;
+  };
+  // street-following waypoints per mission leg (targets come from the game's telemetry)
+  const LEG_WAYPOINTS = [
+    [[60, 280], [60, 155], [65, 150], [150, 150], [210, 150]],   // route end -> market
+    [[200, 150], [180, 150]],                                    // market -> rookery door
+    [[180, 150], [150, 150], [80, 150], [65, 150], [66, 184]],   // rookery -> gin palace
+    [[55, 198]],                                                 // gin palace -> church
+    [[60, 165], [65, 150], [150, 150], [210, 150]],              // church -> market
+  ];
+  let m = await page.evaluate(() => __game.mission);
+  let ok = m.active === true;
+  while (ok && m.target) {
+    for (const [wx, wz] of LEG_WAYPOINTS[m.idx] ?? []) await drive(wx, wz, 6, 45_000);
+    await drive(m.target[0], m.target[1], 3, 45_000);
+    await kb.down('KeyE'); await sleep(120); await kb.up('KeyE'); await sleep(250);
+    const next = await page.evaluate(() => __game.mission);
+    if (next.idx === m.idx) { ok = false; break; }   // E did nothing => fail
+    m = next;
+  }
+  check('mission: round completed with real E-interactions', ok && m.done,
+    m.done ? `${m.seconds.toFixed(1)} s round` : `stalled at leg ${m.idx}/${m.total}`);
+  if (!FAULT && m.done) await page.screenshot({ path: path.join(OUT, 'round-complete.png') });
+}
 
 // ---- proof 3: camera ownership across the whole session ----
 check('camera: gameplay camera owned every sampled frame', camSamples.size === 1 && camSamples.has('gameplay'),
