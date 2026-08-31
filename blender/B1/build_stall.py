@@ -74,12 +74,21 @@ def build_canopy(bm):
     for sx in (-1, 1):
         x = sx * pole_x
         add_cyl(bm, (x, 0, pole_h / 2), 0.03, 0.03, pole_h, PLANKS, segments=8)
-        # socket bracket where the pole meets the trestle head
-        add_box(bm, (x, 0, COUNTER_H - 0.02), (0.10, 0.10, 0.10), IRON)
-        # tie wraps: two thin rings gripping the pole where the canvas is
-        # lashed on, below the visible pole tip
-        add_cyl(bm, (x, 0, attach_z - 0.05), 0.045, 0.045, 0.025, IRON, segments=8)
-        add_cyl(bm, (x, 0, attach_z + 0.03), 0.045, 0.045, 0.025, IRON, segments=8)
+        # socket CLAMP where the pole meets the trestle head (round 3: a bare
+        # cube read as a placeholder block, not a fitting) -- a collar ring
+        # around the pole, a flat backing plate against the trestle head, and
+        # two proud bolt nubs clamping them together.
+        add_cyl(bm, (x, 0, COUNTER_H + 0.03), 0.055, 0.055, 0.09, IRON, segments=10)
+        add_box(bm, (x, 0.10, COUNTER_H - 0.01), (0.12, 0.03, 0.16), IRON)
+        for bz in (COUNTER_H - 0.06, COUNTER_H + 0.06):
+            add_cyl(bm, (x, 0.10, bz), 0.018, 0.018, 0.10, IRON, segments=8, axis='y')
+        # tie wraps: THREE fatter stacked rings gripping the pole where the
+        # canvas is lashed on (round 2's rings were only 15mm proud on the
+        # pole -- invisible at render distance), plus one short diagonal
+        # lashing turn so it reads as rope, not a smooth iron collar.
+        for i, wz in enumerate((attach_z - 0.09, attach_z - 0.02, attach_z + 0.06)):
+            add_cyl(bm, (x, 0, wz), 0.065, 0.065, 0.030, IRON, segments=10)
+        add_beam(bm, (x, -0.05, attach_z - 0.10), (x, 0.05, attach_z + 0.08), 0.018, 0.018, IRON)
 
     n_steps = 12
     dip = 0.20
@@ -133,13 +142,21 @@ def render_pass():
     add_ground_plane(size=6.0)
     add_sun()
     add_fill_sun()
-    tgt = mathutils.Vector((0, 0, 1.1))
-    add_camera("cam_face", (0, -3.6, 1.6), tgt, lens=45)
+    # round 3: cam_face/cam_34 cropped the pole tips + tie wraps (z=1.95-2.1)
+    # -- at lens 45 on a 960x540 frame the vertical half-FOV is only ~12.7 deg,
+    # so a target of z=1.1 at 3.6 m tops out near z=1.9. Retarget higher and
+    # pull back so the whole canopy (poles to 2.1 m) is in frame.
+    tgt = mathutils.Vector((0, 0, 1.3))
+    add_camera("cam_face", (0, -4.3, 1.7), tgt, lens=45)
     render_to(os.path.join(RENDERS_DIR, "stall_face.png"))
-    add_camera("cam_34", (2.6, -2.8, 1.6), tgt, lens=45)
+    add_camera("cam_34", (3.1, -3.3, 1.7), tgt, lens=45)
     render_to(os.path.join(RENDERS_DIR, "stall_34.png"))
-    add_camera("cam_detail", (LEN / 2 + 0.5, -0.6, 1.3),
-               mathutils.Vector((LEN / 2 - 0.1, 0, 0.7)), lens=60)
+    # detail: re-aimed at the ACTUAL X-crossing peg (trestle at x=LEN/2-0.18,
+    # peg at z=COUNTER_H*0.42) -- round 2's camera targeted the canopy-pole
+    # area instead and cropped the peg entirely.
+    peg_x, peg_z = LEN / 2 - 0.18, COUNTER_H * 0.42
+    add_camera("cam_detail", (peg_x + 0.55, -0.55, peg_z + 0.15),
+               mathutils.Vector((peg_x, 0, peg_z)), lens=55)
     render_to(os.path.join(RENDERS_DIR, "stall_detail.png"))
 
 
@@ -148,8 +165,12 @@ if __name__ == "__main__":
     bpy.ops.wm.save_as_mainfile(filepath="C:/Users/USERNAME/Downloads/projects/victorian-london/blender/B1/stall.blend")
     if "--quick" in sys.argv:
         add_ground_plane(size=6.0)
-        add_camera("cq", (2.6, -2.8, 1.6), mathutils.Vector((0, 0, 1.1)), lens=45)
+        add_camera("cq", (3.1, -3.3, 1.7), mathutils.Vector((0, 0, 1.3)), lens=45)
         quick_check(os.path.join(RENDERS_DIR, "stall_quick.png"), res=800)
+        peg_x, peg_z = LEN / 2 - 0.18, COUNTER_H * 0.42
+        add_camera("cq2", (peg_x + 0.55, -0.55, peg_z + 0.15),
+                   mathutils.Vector((peg_x, 0, peg_z)), lens=55)
+        quick_check(os.path.join(RENDERS_DIR, "stall_quick_peg.png"), res=800)
     else:
         render_pass()
         export_glb([obj], os.path.join(MODELS_DIR, "stall.glb"))

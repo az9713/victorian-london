@@ -5,3 +5,5 @@ meshy/*/remeshed.glb
 meshy/*/basic_*
 meshy/*/anim_*.fbx
 meshy/input/
+__pycache__/
+*.blend1
