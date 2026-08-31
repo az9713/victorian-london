@@ -1,1 +1,7 @@
 .env
+meshy/*/model.fbx
+meshy/*/model.glb
+meshy/*/remeshed.glb
+meshy/*/basic_*
+meshy/*/anim_*.fbx
+meshy/input/

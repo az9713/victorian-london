@@ -1,7 +1,8 @@
 <!doctype html>
 <!--
-  Stage 1 greybox sandbox — victorian-london (1880s Whitechapel/Spitalfields)
-  All figures come from refpack/README.md (the authority). Never scale off a plate.
+  Stage 1+ sandbox — victorian-london (1880s Whitechapel/Spitalfields)
+  Layout records live in ./layout.js (single source for game, colliders, and
+  asset assembly). Figures from refpack/README.md. Never scale off a plate.
   Coordinates: x = west->east [0,350], z = north->south [0,300], y up. Datum +0.00 = ground.
   Sim runs on rAF: THE TAB MUST BE VISIBLE while a gate holds keys (documented choice).
   Telemetry: window.__game (READ-ONLY state), window.__probe (raw key event log).
@@ -32,6 +33,9 @@
 </script>
 <script type="module">
 import * as THREE from 'three';
+import { buildLayout } from './layout.js';
+
+const L = buildLayout();
 
 // ---------- scene ----------
 const scene = new THREE.Scene();
@@ -49,110 +53,78 @@ addEventListener('resize', ()=>{ gameplayCamera.aspect=innerWidth/innerHeight;
 scene.add(new THREE.HemisphereLight(0xcfd8e3, 0x55606b, 1.0));
 const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(120,180,80); scene.add(sun);
 
-// ---------- single-source geometry: every record = mesh + (optional) collider ----------
+// ---------- greybox from layout records: every record = mesh + (optional) collider ----------
 const colliders = [];                                   // {x1,z1,x2,z2}
 const mat = c => new THREE.MeshLambertMaterial({color:c});
 const CLAY=0x9aa0a6, CLAY2=0x8a9096, LANDMARK=0xb0a893, IRON=0x6b7280, DARK=0x4b5563;
-
-function box(x1,z1,x2,z2,y0,y1,color,collide=true){
-  const m = new THREE.Mesh(new THREE.BoxGeometry(x2-x1,y1-y0,z2-z1), mat(color));
-  m.position.set((x1+x2)/2,(y0+y1)/2,(z1+z2)/2); scene.add(m);
-  if (collide && y0 < 1.6 && y1 > 0.3) colliders.push({x1,z1,x2,z2});
-  return m;
+const KIND_COLOR = {
+  'viaduct-pier':IRON, 'viaduct-deck':IRON, 'market-wall':LANDMARK, 'market-column':CLAY2,
+  'church-nave':LANDMARK, 'church-tower':LANDMARK, 'ginpalace':0xa89a7e,
+  'ginpalace-front':0xd8c98a, 'rookery':CLAY2, 'rookery-wall':CLAY2, 'gy-flank':CLAY,
+  'terrace0':CLAY, 'terrace1':CLAY2, 'terrace2':0x93999f,
+};
+for (const b of L.boxes){
+  if (b.kind !== 'bounds'){
+    const m = new THREE.Mesh(new THREE.BoxGeometry(b.x2-b.x1, b.y1-b.y0, b.z2-b.z1),
+                             mat(KIND_COLOR[b.kind] ?? CLAY));
+    m.position.set((b.x1+b.x2)/2,(b.y0+b.y1)/2,(b.z1+b.z2)/2);
+    scene.add(m);
+  }
+  if (b.collide && b.y0 < 1.6 && b.y1 > 0.3)
+    colliders.push({x1:b.x1,z1:b.z1,x2:b.x2,z2:b.z2});
 }
 
 // ground: 350 x 300, LEVEL by ruling
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(350,300), mat(0x7d8288));
-ground.rotation.x = -Math.PI/2; ground.position.set(175,0,150); scene.add(ground);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(L.bounds.x, L.bounds.z), mat(0x7d8288));
+ground.rotation.x = -Math.PI/2; ground.position.set(L.bounds.x/2, 0, L.bounds.z/2); scene.add(ground);
 
-// L4 viaduct — STRAIGHT, west-east, north edge. Arch 9.00 high x 18.00 span, deck +15.00
-for (let cx=2; cx<=348; cx+=22) box(cx-2,4,cx+2,16,0,9,IRON);            // piers 4 wide, 18 gaps
-box(0,3,350,17,9,15,IRON,false);                                          // deck slab (overhead)
-
-// L1 market building: plaza x[184.5,284.5] z[120,180]; building 84x44, eaves +9, ridge +14
-const MB={x1:192.5,x2:276.5,z1:128,z2:172};
-box(MB.x1,MB.z1,MB.x2,MB.z1+1,0,9,LANDMARK);                              // north wall
-box(MB.x1,MB.z2-1,MB.x2,MB.z2,0,9,LANDMARK);                              // south wall
-for (const wx of [[MB.x1,MB.x1+1],[MB.x2-1,MB.x2]]){                      // e/w walls, 12 m gap @z150
-  box(wx[0],MB.z1,wx[1],144,0,9,LANDMARK);
-  box(wx[0],156,wx[1],MB.z2,0,9,LANDMARK);
-}
-for (let cx=MB.x1+10; cx<MB.x2-4; cx+=12) for (const cz of [140,160])
-  box(cx-.4,cz-.4,cx+.4,cz+.4,0,9,CLAY2);                                 // iron columns
-for (const s of [-1,1]){                                                  // gable roof to ridge +14
-  const w=(MB.z2-MB.z1)/2, L=Math.hypot(w,5);
-  const r=new THREE.Mesh(new THREE.BoxGeometry(MB.x2-MB.x1,0.3,L), mat(0xaab4bd));
-  r.position.set((MB.x1+MB.x2)/2, 11.5, 150 + s*w/2); r.rotation.x = -s*Math.atan2(5,w);
-  scene.add(r);
-}
-
-// L2 Christ Church — faces Commercial St from the WEST side, front at x=39 (12 m setback)
-box(9,192,31,223,0,18,LANDMARK);                                          // nave, roof +18
-box(31,203.5,39,211.5,0,35,LANDMARK);                                     // tower
-const spire=new THREE.Mesh(new THREE.ConeGeometry(5.2,15,4), mat(LANDMARK));
-spire.position.set(35,42.5,207.5); spire.rotation.y=Math.PI/4; scene.add(spire); // apex +50
-
-// L3 gin palace — Commercial St EAST side, 3 storeys, parapet +11, glazed gas-lit front
-box(69,178,84,198,0,11,0xa89a7e);
-box(69.05,180,69.3,196,0,3.5,0xd8c98a,false);                             // glazed front hint
-
-// L5 rookery — Dorset St south side, EAST of George Yard; parapet +14.50, courtyard 3.70
-box(152,155.5,190,164.5,0,14.5,CLAY2);                                    // front block
-box(152,168.2,190,177,0,14.5,CLAY2);                                      // rear block (3.7 court)
-box(190,155.5,191,177,0,14.5,CLAY2);                                      // east court wall
-
-// L6 George Yard — 4.00 wide slot x[148,152], walls both sides +12
-box(140,26,148,144.5,0,12,CLAY);                                          // west flank
-box(152,26,160,144.5,0,12,CLAY);                                          // east flank
-
-// L7 pillar box on Commercial Street, height 1.40
-const pb=new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,1.4,12), mat(0x7a3030));
-pb.position.set(52.8,0.7,172); scene.add(pb); colliders.push({x1:52.5,z1:171.7,x2:53.1,z2:172.3});
-
-// fill terraces: frontage 5.00, parapets 10.50–14.00 (seeded, stable)
-let seed=42; const rnd=()=> (seed=(seed*1103515245+12345)&0x7fffffff)/0x7fffffff;
-function terraces(axis, fixed1, fixed2, from, to, gaps){                  // gaps: [[a,b],...]
-  for (let a=from; a+5<=to; a+=5){
-    if (gaps.some(g=>a<g[1] && a+5>g[0])) continue;
-    const h=10.5+rnd()*3.5, c=[CLAY,CLAY2,0x93999f][(rnd()*3)|0];
-    if (axis==='z') box(fixed1,a,fixed2,a+5,0,h,c); else box(a,fixed1,a+5,fixed2,0,h,c);
+// market gable roof to ridge +14 (derived from the market record)
+{
+  const MB = L.market;
+  for (const s of [-1,1]){
+    const w=(MB.z2-MB.z1)/2, len=Math.hypot(w,5);
+    const r=new THREE.Mesh(new THREE.BoxGeometry(MB.x2-MB.x1,0.3,len), mat(0xaab4bd));
+    r.position.set((MB.x1+MB.x2)/2, 11.5, 150 + s*w/2); r.rotation.x = -s*Math.atan2(5,w);
+    scene.add(r);
   }
 }
-terraces('z',37,51,26,300,[[185,230]]);                 // Commercial west (gap: church+forecourt)
-terraces('z',69,83,26,300,[[144.5,155.5],[178,198],[120,180]]); // Commercial east (Dorset, pub — plaza gap unused here, x<184)
-terraces('z',270.5,284.5,26,300,[[120,180]]);           // Brick Lane west (gap: plaza join)
-terraces('z',295.5,309.5,26,300,[]);                    // Brick Lane east
-terraces('x',26,40,0,350,[[51,69],[140,160],[284.5,295.5]]); // viaduct street south side
-terraces('x',130.5,144.5,69,140,[]);                    // Dorset north, west of George Yard
-terraces('x',130.5,144.5,160,184.5,[]);                 // Dorset north, east of George Yard
-terraces('x',155.5,169.5,84,152,[]);                    // Dorset south, west of rookery
-terraces('x',106,120,184.5,284.5,[]);                   // plaza north frame
-terraces('x',180,194,184.5,284.5,[[190,200]]);          // plaza south frame (one exit gap kept)
 
-// gas lamps: spacing 65 on Commercial + Brick Lane, height 2.40; George Yard exactly 1
-function lamp(x,z){ const p=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,2.4,8), mat(DARK));
-  p.position.set(x,1.2,z); scene.add(p);
-  const h=new THREE.Mesh(new THREE.BoxGeometry(.28,.34,.28), mat(0xd8c98a)); h.position.set(x,2.45,z); scene.add(h); }
-for (const z of [30,95,160,225,290]){ lamp(52.5,z); lamp(294.5,z); }
-lamp(151,85);                                            // George Yard's single lamp
+// church spire (pyramid, apex +50)
+{
+  const S = L.spire;
+  const spire=new THREE.Mesh(new THREE.ConeGeometry(S.halfBase, S.topY-S.baseY, 4), mat(LANDMARK));
+  spire.position.set(S.x,(S.baseY+S.topY)/2,S.z); spire.rotation.y=Math.PI/4; scene.add(spire);
+}
 
-// slice bounds walls (invisible)
-colliders.push({x1:-2,z1:-2,x2:352,z2:0},{x1:-2,z1:300,x2:352,z2:302},
-               {x1:-2,z1:-2,x2:0,z2:302},{x1:350,z1:-2,x2:352,z2:302});
+// L7 pillar box
+{
+  const P = L.pillarbox;
+  const pb=new THREE.Mesh(new THREE.CylinderGeometry(P.r,P.r,P.h,12), mat(0x7a3030));
+  pb.position.set(P.x,P.h/2,P.z); scene.add(pb);
+  colliders.push({x1:P.x-P.r,z1:P.z-P.r,x2:P.x+P.r,z2:P.z+P.r});
+}
 
-// ---------- player: capsule, third-person ----------
-const player = new THREE.Group();
-const capsule = new THREE.Mesh(new THREE.CapsuleGeometry(0.35,1.05,4,10), mat(0x2dd4bf));
-capsule.position.y = 0.875; player.add(capsule);
-player.position.set(290, 0, 20);                          // spawn: Brick Lane north end
-scene.add(player);
-const P = {r:0.35, walk:4.0, sprint:8.0, yaw:Math.PI, pitch:-0.25};  // yaw PI = facing south
+// gas lamps (height 2.40)
+for (const g of L.lamps){
+  const p=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,2.4,8), mat(DARK));
+  p.position.set(g.x,1.2,g.z); scene.add(p);
+  const h=new THREE.Mesh(new THREE.BoxGeometry(.28,.34,.28), mat(0xd8c98a));
+  h.position.set(g.x,2.45,g.z); scene.add(h);
+}
 
 // ---------- fault injection (gate red-tests ONLY; no fault param = normal game) ----------
 const FAULT = new URLSearchParams(location.search).get('fault');
 if (FAULT==='seal') colliders.push({x1:284,z1:60,x2:296,z2:62});   // seals Brick Lane
 const debugCamera = gameplayCamera.clone(); debugCamera.name='debug';
 debugCamera.position.set(175,120,150); debugCamera.lookAt(175,0,150);
+
+// ---------- player: capsule, third-person ----------
+const player = new THREE.Group();
+const capsule = new THREE.Mesh(new THREE.CapsuleGeometry(0.35,1.05,4,10), mat(0x2dd4bf));
+capsule.position.y = 0.875; player.add(capsule);
+player.position.set(L.spawn.x, 0, L.spawn.z);
+scene.add(player);
+const P = {r:0.35, walk:4.0, sprint:8.0, yaw:L.spawn.yaw, pitch:-0.25};
 
 // ---------- input: held-key STATE (no auto-repeat), raw probe log ----------
 const keys = {};
@@ -189,18 +161,7 @@ function collide(px,pz){
 }
 
 // ---------- route checkpoints (the core loop) ----------
-const route = [
-  ['Head south down Brick Lane',            290, 40],
-  ['Market plaza, east edge',               280, 150],
-  ['Inside the market building',            234, 150],
-  ['Dorset Street, plaza west exit',        180, 150],
-  ['Past the rookery (L5)',                 160, 150],
-  ['George Yard mouth (L6)',                150, 150],
-  ['Commercial Street junction',            65,  150],
-  ['The gin palace (L3)',                   66,  188],
-  ['Christ Church forecourt (L2)',          45,  207],
-  ['Slice exit, Commercial St south end',   60,  296],
-];
+const route = L.route;
 let cp=0, tStart=null, tDone=null;
 const beacon=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.2,30,12,1,true),
   new THREE.MeshBasicMaterial({color:0x2dd4bf,transparent:true,opacity:0.28,side:THREE.DoubleSide}));
@@ -211,7 +172,8 @@ const hud=document.getElementById('hud');
 const frameTimes=[];
 window.__game = { get route(){return route.map(r=>[r[1],r[2]])},
   get x(){return player.position.x}, get z(){return player.position.z},
-  get yaw(){return P.yaw}, get pitch(){return P.pitch}, get cp(){return cp}, get cpName(){return cp<route.length?route[cp][0]:'DONE'},
+  get yaw(){return P.yaw}, get pitch(){return P.pitch}, get cp(){return cp},
+  get cpName(){return cp<route.length?route[cp][0]:'DONE'},
   get routeDone(){return tDone!==null}, get routeSeconds(){return tDone?(tDone-tStart)/1000:null},
   get activeCamera(){return renderer.info.render.frame>0 ? _lastCam : 'none'},
   get fps(){ const s=[...frameTimes].sort((a,b)=>a-b); if(!s.length) return null;
@@ -242,8 +204,8 @@ function tick(now){
     const sp=(keys.ShiftLeft||keys.ShiftRight)?P.sprint:P.walk;
     let nx=player.position.x+mx/len*sp*dt, nz=player.position.z+mz/len*sp*dt;
     [nx,nz]=collide(nx,nz);
-    player.position.x=Math.max(0.4,Math.min(349.6,nx));
-    player.position.z=Math.max(0.4,Math.min(299.6,nz));
+    player.position.x=Math.max(0.4,Math.min(L.bounds.x-0.4,nx));
+    player.position.z=Math.max(0.4,Math.min(L.bounds.z-0.4,nz));
     capsule.rotation.y=Math.atan2(mx,mz);
     if(tStart===null) tStart=performance.now();
   }

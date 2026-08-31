@@ -1,0 +1,13 @@
+{
+  "prompt": "Character turnaround sheet of ONLY the first figure from the reference (the costermonger: corduroy jacket and trousers, striped waistcoat, bright red neckerchief, small flat cap, worn leather boots, 1880s London street vendor). One 16:9 image, exactly three full-body views side by side: FRONT view, SIDE view facing left, BACK view. STRICT T-POSE in all three views: both arms straight out horizontally at shoulder height, clearly separated from the body and the cap, legs straight and slightly apart. No basket, no props, no text, no labels. Plain light-gray background, even flat lighting, consistent scale.",
+  "model": "fal-ai/nano-banana/edit",
+  "provider": "fal",
+  "refs": [
+    "t1-characters_nano-banana_1788152732763.jpg"
+  ],
+  "params": {
+    "aspect_ratio": "16:9"
+  },
+  "cost_usd": 0.039,
+  "created": "2026-08-31T06:05:20.134Z"
+}
