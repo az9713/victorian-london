@@ -215,6 +215,24 @@ function occludeT(ox,oy,oz, dx,dy,dz){
   return best;
 }
 
+// ---------- procedural audio: footsteps on cobbles (WebAudio, no asset files) ----------
+let AC=null, stepTimer=0, stepCount=0;
+function ensureAudio(){ try{ AC ??= new AudioContext(); if(AC.state==='suspended') AC.resume(); }catch(e){} }
+addEventListener('keydown', ensureAudio); addEventListener('mousedown', ensureAudio);
+function footstep(sprint){
+  stepCount++;
+  if(!AC || AC.state!=='running') return;
+  const t=AC.currentTime;
+  const buf=AC.createBuffer(1,2205,44100), d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2);
+  const src=AC.createBufferSource(); src.buffer=buf;
+  const f=AC.createBiquadFilter(); f.type='lowpass';
+  f.frequency.value=(sprint?900:700)+Math.random()*180;      // stone click, slight variance
+  const g=AC.createGain(); g.gain.setValueAtTime(sprint?0.22:0.15,t);
+  g.gain.exponentialRampToValueAtTime(0.001,t+0.09);
+  src.connect(f); f.connect(g); g.connect(AC.destination); src.start(t);
+}
+
 // ---------- collision: circle vs AABB, 2 resolve passes ----------
 function collide(px,pz){
   for (let pass=0; pass<2; pass++) for (const c of colliders){
@@ -246,7 +264,7 @@ window.__game = { get route(){return route.map(r=>[r[1],r[2]])},
   get routeDone(){return tDone!==null}, get routeSeconds(){return tDone?(tDone-tStart)/1000:null},
   get activeCamera(){return renderer.info.render.frame>0 ? _lastCam : 'none'},
   get anim(){return char.model ? char.active : 'no-character'},
-  get world(){return worldReport},
+  get world(){return worldReport}, get steps(){return stepCount},
   get rig(){ if(!char.model) return null;
     const p = char.footBone ? char.footBone.getWorldPosition(new THREE.Vector3()) : null;
     return { bones:char.bones, footBone:char.footBone?.name ?? null,
@@ -293,6 +311,8 @@ function tick(now){
   if(char.model) char.model.rotation.y=char.heading;
   setAnim(len>0 ? (sprinting?'run':'walk') : 'idle');
   if(char.mixer) char.mixer.update(dt);
+  if(len>0){ stepTimer-=dt; if(stepTimer<=0){ footstep(sprinting); stepTimer=sprinting?0.32:0.5; } }
+  else stepTimer=0.12;
 
   // checkpoints
   if(cp<route.length){

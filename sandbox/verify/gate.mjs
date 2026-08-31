@@ -61,6 +61,14 @@ await kb.down('ArrowLeft'); await sleep(400); await kb.up('ArrowLeft'); await sl
 let s4 = await g();
 check('verb: arrow key turns the camera', Math.abs(s4.yaw - s3.yaw) > 0.3, `yaw ${s3.yaw.toFixed(2)} -> ${s4.yaw.toFixed(2)}`);
 
+// ---- verb: footsteps fire while moving (counter measured; audio is procedural) ----
+{
+  const s = await page.evaluate(() => __game.steps);
+  await kb.down('KeyW'); await sleep(1300); await kb.up('KeyW'); await sleep(100);
+  const e = await page.evaluate(() => __game.steps);
+  check('verb: footsteps fire while walking', e - s >= 2, `${e - s} steps in 1.3 s`);
+}
+
 // ---- proof (2b): rig lives — loader read-back + MEASURED joint motion ----
 let rigInfo = null;
 for (let i = 0; i < 50; i++) { rigInfo = await page.evaluate(() => __game.rig); if (rigInfo) break; await sleep(300); }
