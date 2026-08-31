@@ -54,21 +54,22 @@ def build():
     bung_r = radius_at(0.45)
     add_cyl(bm, (bung_r - 0.01, 0, 0.45), 0.032, 0.032, 0.05, IRON, segments=8, axis='x')
 
-    # stave joints: thin recessed grooves running the full height, one per
-    # visible stave -- real geometry, not reliant on facet shading (which
-    # went near-black under the single hard key light at 20 flat facets).
+    # stave joints: thin proud ridges, one per visible stave -- real geometry,
+    # not reliant on facet shading. ONE cylinder per stave spanning the full
+    # height (not one per profile segment) to stay under the prop 8k tri
+    # budget -- a straight rod at the belly's mean radius reads fine at this
+    # scale even though it doesn't hug the exact bulge curve.
+    import math as _m
     n_visible_staves = 12
+    r_mean = sum((r0 + r1) / 2.0 for _, _, r0, r1 in PROFILE) / len(PROFILE)
     for i in range(n_visible_staves):
-        a = 2 * 3.14159265 * i / n_visible_staves
-        import math as _m
+        a = 2 * _m.pi * i / n_visible_staves
         cx, cy = _m.cos(a), _m.sin(a)
-        for z0, z1, r0, r1 in PROFILE:
-            r_mid = (r0 + r1) / 2.0
-            add_cyl(bm, (cx * (r_mid - 0.006), cy * (r_mid - 0.006), (z0 + z1) / 2),
-                    0.010, 0.010, z1 - z0, PLANKS, segments=6, axis='z')
+        add_cyl(bm, (cx * (r_mean - 0.006), cy * (r_mean - 0.006), H / 2),
+                0.010, 0.010, H, PLANKS, segments=6, axis='z')
 
     obj = new_mesh_object("barrel", bm, material_names=MAT_NAMES)
-    add_bevel(obj, width=0.006, segments=2)
+    add_bevel(obj, width=0.006, segments=1)  # segments=1 to stay under the 8k prop tri budget
     apply_all_transforms(obj)
     bpy.ops.object.shade_smooth()
     smart_uv(obj)
