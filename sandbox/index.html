@@ -141,20 +141,24 @@ player.position.set(L.spawn.x, 0, L.spawn.z);
 scene.add(player);
 const P = {r:0.35, walk:4.0, sprint:8.0, yaw:L.spawn.yaw, pitch:-0.25};
 
+const gltfLoader = new GLTFLoader();
+const loadGlb = u => new Promise((res, rej) => gltfLoader.load(u, res, undefined, rej));
+// scale a loaded character to a real height with feet at y=0
+function fitCharacter(model, height){
+  const bb = new THREE.Box3().setFromObject(model);
+  model.scale.setScalar(height / (bb.max.y - bb.min.y));
+  bb.setFromObject(model);
+  model.position.y = -bb.min.y;
+}
+
 // character: idle.glb is the base (skin + Idle clip); walk/run clips retarget onto it
 const char = { model:null, mixer:null, actions:{}, active:null, bones:0, footBone:null, heading:0 };
 {
-  const loader = new GLTFLoader();
-  const load = u => new Promise((res, rej) => loader.load(u, res, undefined, rej));
+  const load = loadGlb;
   Promise.all(['assets/character/idle.glb','assets/character/walk.glb','assets/character/run.glb'].map(load))
     .then(([idle, walk, run]) => {
       const model = idle.scene;
-      // Meshy pivot is not at the feet: snap bounds bottom to y=0, then true height to 1.75
-      const bb = new THREE.Box3().setFromObject(model);
-      const h = bb.max.y - bb.min.y, s = 1.75 / h;
-      model.scale.setScalar(s);
-      bb.setFromObject(model);
-      model.position.y = -bb.min.y;
+      fitCharacter(model, 1.75);          // Meshy pivot is not at the feet
       player.add(model);
       capsule.visible = false;
       char.model = model;
@@ -177,6 +181,54 @@ function setAnim(name){
   to.reset().play();
   if (from) from.crossFadeTo(to, 0.2, false);
   char.active = name;
+}
+
+// ---------- ambient NPCs: flower girl works the plaza, the constable walks his beat ----------
+const npcs = [];
+function spawnNPC(name, height, path, speed){
+  Promise.all([loadGlb(`assets/character/${name}-idle.glb`), loadGlb(`assets/character/${name}-walk.glb`)])
+    .then(([idle, walk]) => {
+      const model = idle.scene;
+      fitCharacter(model, height);
+      const grp = new THREE.Group(); grp.add(model);
+      grp.position.set(path[0][0], 0, path[0][1]);
+      scene.add(grp);
+      const mixer = new THREE.AnimationMixer(model);
+      const act = { idle: mixer.clipAction(idle.animations[0]), walk: mixer.clipAction(walk.animations[0]) };
+      act.walk.play();
+      npcs.push({ grp, model, mixer, act, path, i:1, speed, state:'walk', wait:0, heading:0 });
+    })
+    .catch(e => console.error('npc load failed:', name, e));
+}
+spawnNPC('flowergirl', 1.65,
+  [[210,150],[240,146],[262,150],[252,134],[214,140]], 1.1);
+spawnNPC('constable', 1.80,
+  [[60,60],[60,140],[65,150],[60,225],[57,280],[60,225],[65,150],[60,140]], 1.4);
+function npcTick(dt){
+  for (const n of npcs){
+    n.mixer.update(dt);
+    if (n.state === 'idle'){
+      n.wait -= dt;
+      if (n.wait <= 0){ n.state='walk'; n.act.idle.crossFadeTo(n.act.walk.reset().play(), 0.3, false); }
+      continue;
+    }
+    const [tx, tz] = n.path[n.i];
+    const dx = tx - n.grp.position.x, dz = tz - n.grp.position.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 0.4){
+      n.i = (n.i + 1) % n.path.length;
+      n.state='idle'; n.wait = 2 + Math.random() * 4;
+      n.act.walk.crossFadeTo(n.act.idle.reset().play(), 0.3, false);
+      continue;
+    }
+    const target = Math.atan2(dx, dz);
+    let dh = target - n.heading;
+    while (dh > Math.PI) dh -= 2*Math.PI; while (dh < -Math.PI) dh += 2*Math.PI;
+    n.heading += dh * Math.min(1, 6*dt);
+    n.model.rotation.y = n.heading;
+    n.grp.position.x += dx/d * n.speed * dt;
+    n.grp.position.z += dz/d * n.speed * dt;
+  }
 }
 
 // ---------- input: held-key STATE (no auto-repeat), raw probe log ----------
@@ -322,6 +374,7 @@ window.__game = { get route(){return route.map(r=>[r[1],r[2]])},
   get activeCamera(){return renderer.info.render.frame>0 ? _lastCam : 'none'},
   get anim(){return char.model ? char.active : 'no-character'},
   get world(){return worldReport}, get steps(){return stepCount},
+  get npcs(){return npcs.map(n=>({x:n.grp.position.x, z:n.grp.position.z, state:n.state}))},
   get mission(){return {idx:mission.idx, total:M_POINTS.length, active:mission.active,
     done:mission.tEnd!==null, seconds:mission.tEnd?(mission.tEnd-mission.t0)/1000:null,
     target:mission.idx<M_POINTS.length?[M_POINTS[mission.idx].x,M_POINTS[mission.idx].z]:null}},
@@ -375,6 +428,7 @@ function tick(now){
   else stepTimer=0.12;
 
   missionTick();
+  npcTick(dt);
 
   // checkpoints
   if(cp<route.length){
