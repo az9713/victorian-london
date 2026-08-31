@@ -1,1 +1,1 @@
-# sky-village — floating-island village (RemakeBench pipeline test)
+# victorian-london — Victorian London 3D world (RemakeBench pipeline)
