@@ -251,6 +251,21 @@ def add_fill_light(name="Fill", energy=1.2, loc=(0, -10, 8)):
     return obj
 
 
+def add_world_ambient(strength=0.35, color=(0.55, 0.58, 0.62)):
+    """Flat sky/ambient contribution -- outdoor daylight scenes with only a
+    Sun + one Area fill light shadow deep, narrow recesses (small windows)
+    almost fully black even where real geometry exists; a modest ambient
+    term is physically honest (skylight bounce) and keeps small reveals
+    readable at ctx distance without flattening the Sun's own shadows."""
+    world = bpy.data.worlds.get("World") or bpy.data.worlds.new("World")
+    bpy.context.scene.world = world
+    world.use_nodes = True
+    bg = world.node_tree.nodes.get("Background")
+    if bg:
+        bg.inputs["Color"].default_value = (*color, 1.0)
+        bg.inputs["Strength"].default_value = strength
+
+
 def add_camera(name, loc_blender, look_at_blender, lens=35):
     cam_data = bpy.data.cameras.new(name)
     cam_data.lens = lens

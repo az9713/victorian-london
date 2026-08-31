@@ -18,10 +18,19 @@ C.add_fill_light(energy=2.5, loc=(30, 10, 25))
 C.add_fill_light(name="Fill2", energy=1.8, loc=(-25, -15, 20))
 
 shots = [
-    ("face", C.V(26, 1.6, 0), C.V(15.5, 8, 0), 32),
+    # face: pulled back + retargeted at door mid-height (not portico apex)
+    # so the whole door -- threshold to arch crown -- sits in frame between
+    # the columns, per round-1 judge note.
+    ("face", C.V(34, 1.6, 0), C.V(15.5, 3.3, 0), 26),
     ("34", C.V(28, 1.6, -22), C.V(11, 10, 0), 28),
-    ("detail", C.V(-6.75, 1.6, -25), C.V(-6.75, 6.0, -15.5), 32),
+    # detail: pulled back + wider lens so head AND sill are both in frame,
+    # not just the arches (round-1 judge note).
+    ("detail", C.V(-6.75, 1.6, -27), C.V(-6.75, 6.05, -15.5), 24),
     ("ctx", C.V(52, 12, -44), C.V(10, 23, 0), 22),
+    # extra frame (COMMON allows more than the minimum): close on the belfry
+    # balustrade + a corner pinnacle -- too small to read as "real, not a
+    # solid box" from the pulled-back ctx alone.
+    ("balustrade", C.V(20, 35.2, 8), C.V(12.5, 34.5, 3.7), 40),
 ]
 for name, loc, target, lens in shots:
     C.add_camera("CamF_" + name, loc, target, lens=lens)

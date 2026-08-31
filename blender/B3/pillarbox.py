@@ -19,20 +19,30 @@ R_PLINTH = 0.32
 R_BAND = 0.275  # VR cypher raised ring
 R_CAP = 0.34
 
+# segment count raised 24->48 (12->24 for the finial) and shade_auto_smooth
+# below -- judge round 1: "smoothing/bevels on cone + body facets" was
+# faceted enough to look low-poly at close range even though the geometry
+# itself was correct.
+SEG = 48
+
 # 1. base plinth -- wider than the body, real footing
-C.add_cylinder(bm, 0, 0, 0.0, 0.07, R_PLINTH, segments=24, mat_idx=MAT)
+C.add_cylinder(bm, 0, 0, 0.0, 0.07, R_PLINTH, segments=SEG, mat_idx=MAT)
 
 # 2. main cylindrical body
-C.add_cylinder(bm, 0, 0, 0.07, 1.02, R_BODY, segments=24, mat_idx=MAT)
+C.add_cylinder(bm, 0, 0, 0.07, 1.02, R_BODY, segments=SEG, mat_idx=MAT)
 
-# 3. VR cypher band -- raised relief ring (no text, per brief)
-C.add_cylinder(bm, 0, 0, 0.52, 0.64, R_BAND, segments=24, mat_idx=MAT)
+# 3. VR cypher band -- raised relief medallion: a proud ring with thin
+# moulded top/bottom edges (a cameo frame) so it reads as "something is in
+# relief here" without needing full letterforms
+C.add_cylinder(bm, 0, 0, 0.52, 0.535, R_BAND - 0.01, segments=SEG, mat_idx=MAT, radius_top=R_BAND)
+C.add_cylinder(bm, 0, 0, 0.535, 0.625, R_BAND, segments=SEG, mat_idx=MAT)
+C.add_cylinder(bm, 0, 0, 0.625, 0.64, R_BAND, segments=SEG, mat_idx=MAT, radius_top=R_BAND - 0.01)
 
 # 4. cap -- projecting collar, then a tapered dome to a finial knob
-C.add_cylinder(bm, 0, 0, 1.02, 1.10, R_CAP, segments=24, mat_idx=MAT)
-C.add_cylinder(bm, 0, 0, 1.10, 1.32, R_CAP, segments=24, mat_idx=MAT,
+C.add_cylinder(bm, 0, 0, 1.02, 1.10, R_CAP, segments=SEG, mat_idx=MAT)
+C.add_cylinder(bm, 0, 0, 1.10, 1.32, R_CAP, segments=SEG, mat_idx=MAT,
                radius_top=0.09)
-C.add_cylinder(bm, 0, 0, 1.32, 1.40, 0.09, segments=12, mat_idx=MAT,
+C.add_cylinder(bm, 0, 0, 1.32, 1.40, 0.09, segments=24, mat_idx=MAT,
                radius_top=0.02)
 
 # 5. posting slot: hood (real proud lip) over a shallow recessed slot band
@@ -57,8 +67,10 @@ for i, (sx, sz) in enumerate(hx0):
         f = bm.faces.new((prev_bot, vb, vt, prev_top))
         f.material_index = MAT
     prev_top, prev_bot = vt, vb
-# slot itself -- a slim recessed dark band just under the hood
-slot_r = R_BODY - 0.004
+# slot itself -- a recessed band with a proud lip both above (the hood,
+# built already) AND below, so it reads as a true lipped aperture a letter
+# could be posted into, not just a flat dark strip cut into the cylinder
+slot_r = R_BODY - 0.010
 prev = None
 for i, (sx, sz) in enumerate(hx0):
     p_lo = C.V(slot_r * sx, 0.78, slot_r * sz)
@@ -69,6 +81,17 @@ for i, (sx, sz) in enumerate(hx0):
         f = bm.faces.new((prev[0], vlo, vhi, prev[1]))
         f.material_index = MAT
     prev = (vlo, vhi)
+# bottom lip -- thin proud ledge below the slot, mirroring the hood above
+prev = None
+for i, (sx, sz) in enumerate(hx0):
+    top = C.V((R_BODY + 0.01) * sx, 0.78, (R_BODY + 0.01) * sz)
+    bot = C.V((R_BODY + 0.035) * sx, 0.755, (R_BODY + 0.035) * sz)
+    vt = bm.verts.new(top)
+    vb = bm.verts.new(bot)
+    if prev is not None:
+        f = bm.faces.new((prev[0], prev[1], vt, vb))
+        f.material_index = MAT
+    prev = (vt, vb)
 
 # 6. door -- proud curved panel following the body curvature, set on the
 #    front arc (+z local, facing "out"), with hinge rod one side, lock
@@ -107,14 +130,20 @@ hx, hz = R_BODY * math.sin(hinge_a), R_BODY * math.cos(hinge_a)
 C.add_cylinder(bm, hx * 1.05, hz * 1.05, door_y0 - 0.02, door_y1 + 0.02,
                0.014, segments=8, mat_idx=MAT)
 
-# lock plate + keyhole -- at the door's leading (right) edge
+# lock plate + keyhole -- at the door's leading (right) edge. The keyhole
+# is a proud escutcheon shaped like an actual keyhole (round part + a
+# tapered slot below it), not a plain disc, sitting clear of the lock
+# plate's own front face so there is no embedded-box overlap.
 lock_a = door_half_arc - math.radians(8)
 lx, lz = (R_BODY + 0.02) * math.sin(lock_a), (R_BODY + 0.02) * math.cos(lock_a)
 C.add_box(bm, lx - 0.035, lx + 0.035, 0.42, 0.50, lz - 0.035, lz + 0.035, mat_idx=MAT)
-C.add_cylinder(bm, lx, lz + 0.04, 0.44, 0.46, 0.008, segments=8, mat_idx=MAT)
+key_z = lz + 0.045
+C.add_cylinder(bm, lx, key_z, 0.450, 0.468, 0.010, segments=10, mat_idx=MAT)  # round part
+C.add_box(bm, lx - 0.006, lx + 0.006, 0.428, 0.452, key_z - 0.008, key_z + 0.008, mat_idx=MAT)  # slot
 
 obj = C.new_object("pillarbox", bm, ["postbox_red"])
 C.add_bevel(obj, width=0.008, segments=2)
+C.shade_smooth_auto(obj, angle_deg=35)
 C.smart_uv(obj)
 
 bpy.context.view_layer.objects.active = obj

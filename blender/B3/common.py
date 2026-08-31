@@ -210,6 +210,16 @@ def add_bevel(obj, width=0.02, segments=2, angle_deg=35):
     return mod
 
 
+def shade_smooth_auto(obj, angle_deg=35):
+    """Smooth-shade the object with an angle threshold: curved surfaces
+    (cylinders, arches) read smooth, sharp features (box edges) stay
+    faceted -- Blender 4.1+'s Shade Auto Smooth operator."""
+    with bpy.context.temp_override(active_object=obj, object=obj,
+                                    selected_objects=[obj],
+                                    selected_editable_objects=[obj]):
+        bpy.ops.object.shade_auto_smooth(angle=math.radians(angle_deg))
+
+
 def smart_uv(obj):
     bpy.context.view_layer.objects.active = obj
     for o in bpy.context.selected_objects:
@@ -254,6 +264,26 @@ def setup_render(engine='CYCLES', samples=32, res=(960, 540), device='CPU'):
         scene.cycles.samples = samples
         scene.cycles.use_denoising = True
         scene.cycles.device = device
+    # clear_scene() never touched the world, so every render before this
+    # fix used Blender's near-black startup world with no ambient fill --
+    # any recess, niche, or interior not directly hit by the sun/area
+    # lights rendered pure black even though the geometry was correct.
+    # A mid-grey world at full strength gives every enclosed surface a real
+    # ambient bounce floor so the clay override can never read as an
+    # unevidenced black hole.
+    world = bpy.data.worlds.get("World") or bpy.data.worlds.new("World")
+    scene.world = world
+    world.use_nodes = True
+    bg = world.node_tree.nodes.get("Background")
+    if bg:
+        bg.inputs[0].default_value = (0.45, 0.45, 0.48, 1.0)
+        bg.inputs[1].default_value = 1.8
+    # recessed/enclosed geometry (window reveals, niches, panel mouldings)
+    # needs enough diffuse bounces to pick up any ambient at all -- default
+    # is usually fine but this is cheap insurance against black pockets.
+    if engine == 'CYCLES':
+        scene.cycles.max_bounces = 8
+        scene.cycles.diffuse_bounces = 6
     return scene
 
 
@@ -311,8 +341,13 @@ def apply_clay_override(objects):
         if o.type != 'MESH':
             continue
         backup[o.name] = list(o.data.materials)
-        o.data.materials.clear()
-        o.data.materials.append(clay)
+        if len(o.data.materials) == 0:
+            o.data.materials.append(clay)
+        else:
+            # replace every slot in place (not clear+append) so no face's
+            # material_index is left pointing past the end of the slot list
+            for i in range(len(o.data.materials)):
+                o.data.materials[i] = clay
     return backup
 
 

@@ -12,7 +12,7 @@ sys.path.insert(0, "C:/Users/USERNAME/Downloads/projects/victorian-london/blende
 import common as C
 import parts as P
 
-QUICK = True
+QUICK = False
 
 C.clear_scene()
 
@@ -29,6 +29,7 @@ for obj, storeys, wall_top, parapet_top in objs:
 
 C.add_sun(elevation_deg=42, azimuth_deg=130, energy=3.2)
 C.add_fill_light(loc=(-6, -9, 10), energy=300)
+C.add_world_ambient()
 
 C.setup_render('CYCLES', samples=(16 if QUICK else 32),
                 res=((640, 360) if QUICK else (960, 540)), device='CPU')

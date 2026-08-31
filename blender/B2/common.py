@@ -82,7 +82,22 @@ def new_object(name, bm, material_names):
     first (merge by distance) so shared edges are manifold. Without this the
     bevel modifier treats every box-to-box seam as a boundary edge and
     renders it as a dark crack."""
-    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.001)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.002)
+    # Guard: after welding, no two faces should occupy the same plane at the
+    # same location (overlapping solid boxes -- e.g. a full wall box PLUS a
+    # window helper's own spandrel over the same region) render as black/
+    # non-manifold seams in Cycles even though Workbench hides the bug.
+    seen = {}
+    dupes = 0
+    for f in bm.faces:
+        key = tuple(sorted(tuple(round(c, 3) for c in v.co) for v in f.verts))
+        if key in seen:
+            dupes += 1
+        else:
+            seen[key] = f.index
+    if dupes:
+        print(f"[WARNING] {name}: {dupes} duplicate/coincident faces detected "
+              f"-- likely overlapping solid geometry, will render black seams")
     mesh = bpy.data.meshes.new(name)
     bm.to_mesh(mesh)
     bm.free()
@@ -337,7 +352,8 @@ def restore_materials(objects, backup):
 
 def add_round_window(bm, bay_x0, bay_x1, z_face, thickness, y0_wall, y1_wall,
                       sill_y, springing_y, wall_mat, glass_mat,
-                      seg=8, glass_z_frac=0.5, sill_proud=0.06, sill_mat=None):
+                      seg=8, glass_z_frac=0.5, sill_proud=0.06, sill_mat=None,
+                      bar_mat=None, n_head_bars=3, bars=True):
     """One round-headed window bay, punched through a wall facing +/-z.
 
     Caller is responsible for the piers either side (this only fills the
@@ -410,11 +426,35 @@ def add_round_window(bm, bay_x0, bay_x1, z_face, thickness, y0_wall, y1_wall,
         f.material_index = glass_mat
         prev = cur
 
+    # leaded glazing grid + proud stone architrave -- both stand off the
+    # glass plane by z_bar (never coincident with it): a central mullion +
+    # transom over the rectangular light, radiating lead bars in the head,
+    # and a thin proud surround tracing the whole opening.
+    if bars:
+        bar_mat = wall_mat if bar_mat is None else bar_mat
+        bar_w = 0.035
+        z_bar = z_face - sign * thickness * (glass_z_frac - 0.05)
+        add_box(bm, bx_c - bar_w / 2, bx_c + bar_w / 2, sill_y, springing_y,
+                z_bar, z_bar - sign * 0.015, mat_idx=bar_mat)
+        transom_y = sill_y + (springing_y - sill_y) * 0.5
+        add_box(bm, left_x, right_x, transom_y - bar_w / 2, transom_y + bar_w / 2,
+                z_bar, z_bar - sign * 0.015, mat_idx=bar_mat)
+        for i in range(1, n_head_bars):
+            # radiating lead bar: a short proud stub from the springing line
+            # up to its point on the arch, reading as tracery without the
+            # tri cost of a full curved rib
+            a = math.pi * i / n_head_bars
+            lx = bx_c - half_w * math.cos(a)
+            ly = springing_y + half_w * math.sin(a)
+            add_box(bm, lx - bar_w / 2, lx + bar_w / 2, springing_y - bar_w / 2, ly + bar_w / 2,
+                    z_bar, z_bar - sign * 0.015, mat_idx=bar_mat)
+
 
 def add_rect_window(bm, bay_x0, bay_x1, z_face, thickness, y0_wall, y1_wall,
                      sill_y, head_y, wall_mat, glass_mat, sill_mat=None,
                      sill_proud=0.06, bar_cols=1, bar_rows=1, bar_w=0.05,
-                     bar_mat=None, meeting_rail_y=None, glass_z_frac=0.5):
+                     bar_mat=None, meeting_rail_y=None, glass_z_frac=0.5,
+                     add_glass=True):
     """One rectangular window/door bay, punched through a wall facing +/-z.
     Fills the bay's own x-range only (spandrels above/below + reveal jambs +
     glazing); caller builds the piers either side. bar_cols/bar_rows split
@@ -446,25 +486,28 @@ def add_rect_window(bm, bay_x0, bay_x1, z_face, thickness, y0_wall, y1_wall,
     add_quad(bm, (bay_x0, sill_y, z_inner), (bay_x1, sill_y, z_inner),
              (bay_x1, sill_y, z_outer), (bay_x0, sill_y, z_outer), mat_idx=wall_mat)
 
-    # glazing pane(s), set back in the reveal
-    add_quad(bm, (bay_x0, sill_y, z_glass), (bay_x1, sill_y, z_glass),
-             (bay_x1, head_y, z_glass), (bay_x0, head_y, z_glass), mat_idx=glass_mat)
+    # glazing pane(s), set back in the reveal -- skip when the caller (e.g. a
+    # layered sash unit) supplies its own infill, to avoid a coplanar/
+    # overlapping duplicate pane at the same depth.
+    if add_glass:
+        add_quad(bm, (bay_x0, sill_y, z_glass), (bay_x1, sill_y, z_glass),
+                 (bay_x1, head_y, z_glass), (bay_x0, head_y, z_glass), mat_idx=glass_mat)
 
-    # proud glazing bars: vertical mullions + horizontal bars (+ sash meeting rail)
-    w = bay_x1 - bay_x0
-    h = head_y - sill_y
-    for c in range(1, bar_cols):
-        bx = bay_x0 + w * c / bar_cols
-        add_box(bm, bx - bar_w / 2, bx + bar_w / 2, sill_y, head_y,
-                z_bar, z_bar - sign * 0.02, mat_idx=bar_mat)
-    for r in range(1, bar_rows):
-        by = sill_y + h * r / bar_rows
-        add_box(bm, bay_x0, bay_x1, by - bar_w / 2, by + bar_w / 2,
-                z_bar, z_bar - sign * 0.02, mat_idx=bar_mat)
-    if meeting_rail_y is not None:
-        add_box(bm, bay_x0, bay_x1, meeting_rail_y - bar_w * 0.6,
-                meeting_rail_y + bar_w * 0.6, z_bar, z_bar - sign * 0.02,
-                mat_idx=bar_mat)
+        # proud glazing bars: vertical mullions + horizontal bars (+ sash meeting rail)
+        w = bay_x1 - bay_x0
+        h = head_y - sill_y
+        for c in range(1, bar_cols):
+            bx = bay_x0 + w * c / bar_cols
+            add_box(bm, bx - bar_w / 2, bx + bar_w / 2, sill_y, head_y,
+                    z_bar, z_bar - sign * 0.02, mat_idx=bar_mat)
+        for r in range(1, bar_rows):
+            by = sill_y + h * r / bar_rows
+            add_box(bm, bay_x0, bay_x1, by - bar_w / 2, by + bar_w / 2,
+                    z_bar, z_bar - sign * 0.02, mat_idx=bar_mat)
+        if meeting_rail_y is not None:
+            add_box(bm, bay_x0, bay_x1, meeting_rail_y - bar_w * 0.6,
+                    meeting_rail_y + bar_w * 0.6, z_bar, z_bar - sign * 0.02,
+                    mat_idx=bar_mat)
     # frame proud of the wall face all round (reads as real joinery, not a
     # hole in the brick)
     fw = 0.06
@@ -472,7 +515,7 @@ def add_rect_window(bm, bay_x0, bay_x1, z_face, thickness, y0_wall, y1_wall,
         (bay_x0 - fw, bay_x0, sill_y, head_y),
         (bay_x1, bay_x1 + fw, sill_y, head_y),
         (bay_x0 - fw, bay_x1 + fw, head_y, head_y + fw),
-        (bay_x0 - fw, bay_x1 + fw, sill_y - fw, sill_y),
+        (bay_x0 - fw, bay_x1 + fw, max(sill_y - fw, 0.0), sill_y),
     ):
         add_box(bm, a0, a1, b0, b1, z_outer + sign * 0.02, z_outer - sign * 0.06,
                 mat_idx=bar_mat)
@@ -551,7 +594,7 @@ def add_rect_window_xface(bm, bay_z0, bay_z1, x_face, thickness, y0_wall, y1_wal
                            sill_y, head_y, wall_mat, glass_mat, sill_mat=None,
                            sill_proud=0.06, bar_cols=1, bar_rows=1, bar_w=0.05,
                            bar_mat=None, meeting_rail_y=None, glass_x_frac=0.5,
-                           frame=True):
+                           frame=True, add_glass=True):
     """X-facing counterpart of add_rect_window (wall faces +/-x; the opening's
     horizontal extent runs along z, thickness along x). Used for the gin
     palace's west shopfront/upper sashes. Built entirely with add_box/add_quad
@@ -582,33 +625,155 @@ def add_rect_window_xface(bm, bay_z0, bay_z1, x_face, thickness, y0_wall, y1_wal
     add_quad(bm, (x_inner, sill_y, bay_z0), (x_inner, sill_y, bay_z1),
              (x_outer, sill_y, bay_z1), (x_outer, sill_y, bay_z0), mat_idx=wall_mat)
 
-    # glazing pane, set back in the reveal
-    add_quad(bm, (x_glass, sill_y, bay_z0), (x_glass, sill_y, bay_z1),
-             (x_glass, head_y, bay_z1), (x_glass, head_y, bay_z0), mat_idx=glass_mat)
+    # glazing pane, set back in the reveal -- skip when the caller supplies
+    # its own infill (e.g. a layered sash unit), to avoid a coplanar/
+    # overlapping duplicate pane at the same depth.
+    if add_glass:
+        add_quad(bm, (x_glass, sill_y, bay_z0), (x_glass, sill_y, bay_z1),
+                 (x_glass, head_y, bay_z1), (x_glass, head_y, bay_z0), mat_idx=glass_mat)
 
-    w = bay_z1 - bay_z0
-    h = head_y - sill_y
-    for c in range(1, bar_cols):
-        bz = bay_z0 + w * c / bar_cols
-        add_box(bm, x_bar, x_bar - sign * 0.02, sill_y, head_y,
-                bz - bar_w / 2, bz + bar_w / 2, mat_idx=bar_mat)
-    for r in range(1, bar_rows):
-        by = sill_y + h * r / bar_rows
-        add_box(bm, x_bar, x_bar - sign * 0.02, by - bar_w / 2, by + bar_w / 2,
-                bay_z0, bay_z1, mat_idx=bar_mat)
-    if meeting_rail_y is not None:
-        add_box(bm, x_bar, x_bar - sign * 0.02, meeting_rail_y - bar_w * 0.6,
-                meeting_rail_y + bar_w * 0.6, bay_z0, bay_z1, mat_idx=bar_mat)
+        w = bay_z1 - bay_z0
+        h = head_y - sill_y
+        for c in range(1, bar_cols):
+            bz = bay_z0 + w * c / bar_cols
+            add_box(bm, x_bar, x_bar - sign * 0.02, sill_y, head_y,
+                    bz - bar_w / 2, bz + bar_w / 2, mat_idx=bar_mat)
+        for r in range(1, bar_rows):
+            by = sill_y + h * r / bar_rows
+            add_box(bm, x_bar, x_bar - sign * 0.02, by - bar_w / 2, by + bar_w / 2,
+                    bay_z0, bay_z1, mat_idx=bar_mat)
+        if meeting_rail_y is not None:
+            add_box(bm, x_bar, x_bar - sign * 0.02, meeting_rail_y - bar_w * 0.6,
+                    meeting_rail_y + bar_w * 0.6, bay_z0, bay_z1, mat_idx=bar_mat)
     if frame:
         fw = 0.06
         for (b0, b1, c0, c1) in (
             (bay_z0 - fw, bay_z0, sill_y, head_y),
             (bay_z1, bay_z1 + fw, sill_y, head_y),
             (bay_z0 - fw, bay_z1 + fw, head_y, head_y + fw),
-            (bay_z0 - fw, bay_z1 + fw, sill_y - fw, sill_y),
+            (bay_z0 - fw, bay_z1 + fw, max(sill_y - fw, 0.0), sill_y),
         ):
             add_box(bm, x_outer - sign * 0.02, x_outer + sign * 0.06, c0, c1,
                     b0, b1, mat_idx=bar_mat)
+
+
+def _sash_layers(sill_y, head_y, thickness, meeting_frac=0.52):
+    """Shared sash geometry (depth-independent numbers): meeting rail height,
+    lower/upper sash depth fractions (offset from each other so their rails
+    never sit in the same plane), stile/rail/astragal sizes."""
+    meeting_y = sill_y + (head_y - sill_y) * meeting_frac
+    return dict(meeting_y=meeting_y, frac_lower=0.30, frac_upper=0.55,
+                stile_w=0.05, rail_h=0.055, astragal_w=0.04)
+
+
+def add_sash_zface(bm, bay_x0, bay_x1, z_face, thickness, sill_y, head_y,
+                    frame_mat, glass_mat):
+    """Real layered sash unit filling a window opening on a +/-z wall: lower
+    and upper sash each with 2 stiles, top/bottom rails and an astragal
+    (2-over-2), sitting at two DIFFERENT depths so the meeting rail overlap
+    reads and nothing is coplanar. Call add_rect_window(..., add_glass=False)
+    first to build the spandrels/reveal, then this to fill the opening."""
+    sign = 1.0 if z_face >= 0 else -1.0
+    L = _sash_layers(sill_y, head_y, thickness)
+    my = L['meeting_y']; sw = L['stile_w']; rh = L['rail_h']; aw = L['astragal_w']
+    z_lo = z_face - sign * thickness * L['frac_lower']
+    z_up = z_face - sign * thickness * L['frac_upper']
+    uc = (bay_x0 + bay_x1) / 2.0
+
+    def box(x0, x1, y0, y1, zc, mat):
+        add_box(bm, x0, x1, y0, y1, zc - 0.014, zc + 0.014, mat_idx=mat)
+
+    def pane(x0, x1, y0, y1, zc, mat):
+        add_quad(bm, (x0, y0, zc), (x1, y0, zc), (x1, y1, zc), (x0, y1, zc), mat_idx=mat)
+
+    for (y_lo, y_hi, y_rail_near, zc) in ((sill_y, my, my - rh * 0.55, z_lo),
+                                           (my, head_y, head_y - rh * 0.55, z_up)):
+        box(bay_x0, bay_x0 + sw, y_lo, y_hi, zc, frame_mat)
+        box(bay_x1 - sw, bay_x1, y_lo, y_hi, zc, frame_mat)
+        box(bay_x0, bay_x1, y_lo, y_lo + rh, zc, frame_mat)
+        box(bay_x0, bay_x1, y_rail_near - rh * 0.6, y_rail_near + rh * 0.6, zc, frame_mat)
+        box(uc - aw / 2, uc + aw / 2, y_lo + rh, y_rail_near - rh * 0.6, zc, frame_mat)
+        pane(bay_x0 + sw, uc - aw / 2, y_lo + rh, y_rail_near - rh * 0.6, zc, glass_mat)
+        pane(uc + aw / 2, bay_x1 - sw, y_lo + rh, y_rail_near - rh * 0.6, zc, glass_mat)
+
+
+def add_sash_xface(bm, bay_z0, bay_z1, x_face, thickness, sill_y, head_y,
+                    frame_mat, glass_mat):
+    """X-facing counterpart of add_sash_zface (front-wall sashes)."""
+    sign = 1.0 if x_face >= 0 else -1.0
+    L = _sash_layers(sill_y, head_y, thickness)
+    my = L['meeting_y']; sw = L['stile_w']; rh = L['rail_h']; aw = L['astragal_w']
+    x_lo = x_face - sign * thickness * L['frac_lower']
+    x_up = x_face - sign * thickness * L['frac_upper']
+    uc = (bay_z0 + bay_z1) / 2.0
+
+    def box(z0, z1, y0, y1, xc, mat):
+        add_box(bm, xc - 0.014, xc + 0.014, y0, y1, z0, z1, mat_idx=mat)
+
+    def pane(z0, z1, y0, y1, xc, mat):
+        add_quad(bm, (xc, y0, z0), (xc, y0, z1), (xc, y1, z1), (xc, y1, z0), mat_idx=mat)
+
+    for (y_lo, y_hi, y_rail_near, xc) in ((sill_y, my, my - rh * 0.55, x_lo),
+                                           (my, head_y, head_y - rh * 0.55, x_up)):
+        box(bay_z0, bay_z0 + sw, y_lo, y_hi, xc, frame_mat)
+        box(bay_z1 - sw, bay_z1, y_lo, y_hi, xc, frame_mat)
+        box(bay_z0, bay_z1, y_lo, y_lo + rh, xc, frame_mat)
+        box(bay_z0, bay_z1, y_rail_near - rh * 0.6, y_rail_near + rh * 0.6, xc, frame_mat)
+        box(uc - aw / 2, uc + aw / 2, y_lo + rh, y_rail_near - rh * 0.6, xc, frame_mat)
+        pane(bay_z0 + sw, uc - aw / 2, y_lo + rh, y_rail_near - rh * 0.6, xc, glass_mat)
+        pane(uc + aw / 2, bay_z1 - sw, y_lo + rh, y_rail_near - rh * 0.6, xc, glass_mat)
+
+
+def add_panelled_door_xface(bm, bay_z0, bay_z1, x_face, thickness, sill_y, head_y,
+                             frame_mat, panel_mat, n_panels=4):
+    """A panelled door leaf (stiles + rails, real RECESSED flat panels set
+    back behind them) filling an opening on a +/-x wall. Call
+    add_rect_window_xface(..., add_glass=False) first for the reveal/
+    spandrel, then this for the leaf."""
+    sign = 1.0 if x_face >= 0 else -1.0
+    x_frame = x_face - sign * thickness * 0.35
+    x_panel = x_face - sign * thickness * 0.5
+    sw, rh = 0.06, 0.07
+    add_box(bm, x_frame - 0.014, x_frame + 0.014, sill_y, head_y, bay_z0, bay_z0 + sw, mat_idx=frame_mat)
+    add_box(bm, x_frame - 0.014, x_frame + 0.014, sill_y, head_y, bay_z1 - sw, bay_z1, mat_idx=frame_mat)
+    h_total = head_y - sill_y
+    panel_h = (h_total - rh * (n_panels + 1)) / n_panels
+    y = sill_y
+    for i in range(n_panels + 1):
+        add_box(bm, x_frame - 0.014, x_frame + 0.014, y, y + rh, bay_z0, bay_z1, mat_idx=frame_mat)
+        y += rh
+        if i < n_panels:
+            add_quad(bm, (x_panel, y, bay_z0 + sw), (x_panel, y, bay_z1 - sw),
+                      (x_panel, y + panel_h, bay_z1 - sw), (x_panel, y + panel_h, bay_z0 + sw),
+                      mat_idx=panel_mat)
+            y += panel_h
+
+
+def add_fanlight_xface(bm, bay_z0, bay_z1, x_face, thickness, sill_y, head_y,
+                        frame_mat, glass_mat, n_rays=5):
+    """A transom fanlight with bars RADIATING from a hub at the bottom
+    centre (not plain verticals) filling an opening on a +/-x wall. Call
+    add_rect_window_xface(..., add_glass=False) first for the reveal/
+    spandrel, then this for the infill."""
+    sign = 1.0 if x_face >= 0 else -1.0
+    x_glass = x_face - sign * thickness * 0.6
+    x_bar = x_face - sign * thickness * 0.15
+    uc = (bay_z0 + bay_z1) / 2.0
+    add_quad(bm, (x_glass, sill_y, bay_z0), (x_glass, sill_y, bay_z1),
+             (x_glass, head_y, bay_z1), (x_glass, head_y, bay_z0), mat_idx=glass_mat)
+    half_w = 0.025
+    for i in range(n_rays):
+        tz = bay_z0 + (bay_z1 - bay_z0) * i / (n_rays - 1) if n_rays > 1 else uc
+        dz, dy = tz - uc, head_y - sill_y
+        length = math.hypot(dz, dy)
+        if length < 1e-6:
+            continue
+        pz, py = -dy / length * half_w, dz / length * half_w
+        add_quad(bm, (x_bar, sill_y - py, uc - pz), (x_bar, sill_y + py, uc + pz),
+                 (x_bar, head_y + py, tz + pz), (x_bar, head_y - py, tz - pz), mat_idx=frame_mat)
+    # bottom rail of the fanlight (springing line) + outer edge bar
+    add_box(bm, x_bar - 0.01, x_bar + 0.02, sill_y - 0.025, sill_y + 0.025,
+            bay_z0, bay_z1, mat_idx=frame_mat)
 
 
 def add_round_door_xface(bm, bay_z0, bay_z1, x_face, thickness, y0_wall, y1_wall,
