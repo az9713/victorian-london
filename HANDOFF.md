@@ -57,9 +57,16 @@ quotes, or a judge loop that will not converge.
   (48 fps median). Builder session limits reset 2:10pm PT 2026-08-31; if the
   r-builders are dead, spawn NEW builder agents pointed at the fixlist files
   (BRIEF-COMMON.md + their batch brief + fixlist is a complete work order).
+- **BUDGET RULE (the operator, 2026-08-31 ~15:15 PT): 7% Fable left, reset in >2
+  days.** Spawn ALL subagents (builders AND judges) with `model: sonnet`
+  until the reset. Parent (Fable) does orchestration only; keep turns lean.
+  If Sonnet also runs low, switch judges to the off-quota cross-model
+  wrappers `codex-sub`/`grok-sub` (verified on this machine, see above).
 - **Resume 15:0x PT 2026-08-31 (post-/clear):** B1r/B3r were limit-killed
-  mid-r3 and are hard-stopped via TaskStop (do not message them). FRESH
-  builders `builder-B1-r3f` and `builder-B3-r3f` now run the fixlist files.
+  mid-r3 and are hard-stopped via TaskStop (do not message them). Fresh
+  Fable builders (-r3f) were spawned, then stopped minutes later for the
+  budget rule. FRESH SONNET builders `builder-B1-r3s` and `builder-B3-r3s`
+  now run the fixlist files.
   Known partial r3 work in the tree: commit 6ccdf44 exported sacks/stall/
   barrel/rookery GLBs at 14:48, but renders (~11:05) + manifests are stale
   and sacks has NO current renders. Builders were told to finish, re-export,
