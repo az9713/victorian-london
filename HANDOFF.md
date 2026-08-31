@@ -43,6 +43,18 @@ quotes, or a judge loop that will not converge.
   parent-made inventory via `node scripts/glb_inventory.mjs`.
 - **NPCs + mission live** (tag `stage5-mission-skeleton`, commit 2199e80): gate
   is 15 checks, all passing, incl. mission round + NPC motion (measured).
+- **2a judge loops (as of 2026-08-31 11:05 PT):** B4 PASSED r2 (tag
+  `2a-terraces-pass`), B2 PASSED r2 (tag `2a-church-ginpalace-pass`).
+  B1 r2 FAIL min 2 (market 4, crate 4, barrel 3, stall 3, sacks 2) — r3 fix
+  list routed (sacks cloth rebuild w/ tri budget, stall tie-wraps + peg frame,
+  barrel detail re-aim + de-spike, market gable close-up). B3 r2 FAIL min 3
+  (pillarbox 4, rest 3) — r3 list routed (viaduct springing hole + ring order,
+  rookery boarding + black dots, gaslamp floor blob + louvres, gy-flank
+  reshoots). BOTH builders (B1r, B3r) died at session limit mid-r3; RESETS
+  2:10pm PT — on wake, SendMessage both to resume (their fix lists are in
+  their inboxes; B1r was reframing the gable shot, B3r trimming architrave
+  corners). Judges are always FRESH per round. Full assembled game passes the
+  15/15 gate with round-2 assets (48 fps median).
 
 ## What this project is
 A playable third-person 3D world: **1880s Victorian London, Whitechapel/Spitalfields**,
