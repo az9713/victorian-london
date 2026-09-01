@@ -611,12 +611,23 @@ boarded_y = (3.5 + FLOOR_H * 0.30 + 3.5 + FLOOR_H * 0.78) / 2  # bay (3,1) centr
 cam_boarded = C.add_camera("cam_boarded", C.V(boarded_xc + 1.1, boarded_y + 0.35, FRONT_Z0 - 2.6),
                             C.V(boarded_xc, boarded_y, FRONT_Z0), lens=42)
 cam_yard = C.add_camera("cam_yard", C.V(10, 2.6, -0.4), C.V(17.7, 1.3, -0.5), lens=28)
+# round-4 fixlist item 2a: a full 12-pane glazing-bar grid needs a close
+# crop to actually be countable -- at rookery_face.png's whole-facade scale
+# the panes are only a few pixels each. Dedicated close-up on one first-
+# floor sash, same precedent as _boarded/_yard.
+win_xc = bay_x(0)
+win_y_sill = 3.5 + FLOOR_H * 0.30
+win_y_lintel = 3.5 + FLOOR_H * 0.78
+win_y_mid = (win_y_sill + win_y_lintel) / 2
+cam_window = C.add_camera("cam_window", C.V(win_xc - 1.0, win_y_mid, FRONT_Z0 - 3.5),
+                           C.V(win_xc, win_y_mid, FRONT_Z0), lens=55)
 
 C.setup_render('CYCLES', samples=32, res=(960, 540), device='CPU')
 
 backup = C.apply_clay_override([obj])
 for cam, name in ((cam_face, "face"), (cam_34, "34"), (cam_detail, "detail"),
-                   (cam_ctx, "ctx"), (cam_boarded, "boarded"), (cam_yard, "yard")):
+                   (cam_ctx, "ctx"), (cam_boarded, "boarded"), (cam_yard, "yard"),
+                   (cam_window, "window")):
     bpy.context.scene.camera = cam
     C.render_to(C.RENDER_DIR + f"/rookery_{name}.png")
 C.restore_materials([obj], backup)

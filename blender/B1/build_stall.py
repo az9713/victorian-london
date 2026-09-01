@@ -243,11 +243,37 @@ def add_rope_wrap(bm, pole_x, attach_z, canvas_mat, rope_mat, pole_r=0.03, seed=
             f.smooth = True
 
 
+def add_tie_loop(bm, x, z_top, z_bot, mat_index, thick=0.010):
+    """A small drooping tie-down cord from the ridge rope (z_top) down to
+    the canvas ridge (z_bot), used for the canopy's 3 interior tie points
+    (fixlist 2a). r6 2nd pass: the first version was a small CLOSED loop
+    (rope_from_curve, bevel_res=2, 8-point profile) -- geometrically correct
+    but 128 tris each (384 for 3), which blew the already razor-thin 8,000
+    prop budget. A simple two-segment drooping cord (add_beam, a plain
+    rectangular rod) is a fraction of the cost and reads just as clearly as
+    "a cord tying the canvas to the ridge" at the size these render at."""
+    mid = (x + 0.012, 0.018, (z_top + z_bot) / 2.0 - 0.006)  # slight sideways+downward droop
+    add_beam(bm, (x, 0.0, z_top), mid, thick, thick, mat_index)
+    add_beam(bm, mid, (x, 0.0, z_bot), thick, thick, mat_index)
+
+
 def build_canopy(bm):
     """A continuous swept, sagging canvas sheet with real thickness (round 2
     rebuild -- the flat unrotated panel segments used before left visible
     seams and were the source of the black-rod render artifact the judge
-    flagged; a single swept surface has neither problem)."""
+    flagged; a single swept surface has neither problem).
+
+    r6 fixlist 2a REBUILD: the single-span sine sag read as "a rigid moulded
+    panel", not cloth -- one smooth dip end to end has no support logic
+    (a canopy hangs FROM tie points, it doesn't just curve). This version
+    adds a ridge support rope strung between the two pole tops, 3 more tie
+    points along it (5 total including the 2 poles), and the canvas now
+    sags in 4 separate catenary-like cells between those 5 support points
+    -- each cell returns to baseline at its own support, so 4 distinct dips
+    are visible instead of one continuous curve. The two long free edges
+    (the canopy's front/back, not the pole ends) get a rolled hem tube with
+    real thickness, following the same per-cell sag as the sheet it hems.
+    """
     pole_h = 2.1
     pole_x = LEN / 2.0 + 0.08
     attach_z = pole_h - 0.10   # canvas end wraps the pole BELOW its tip
@@ -273,15 +299,39 @@ def build_canopy(bm):
         add_rope_wrap(bm, x, attach_z, PLASTER, IRON, seed=1 if sx < 0 else 2,
                        cam_azimuth=az)
 
-    n_steps = 12
-    dip = 0.20
+    # r6: ridge support rope between the two pole tops -- gives the 3
+    # interior sag cells something to physically hang from, instead of the
+    # fabric rising to full baseline height mid-span with no support (which
+    # reads as floating cloth, not a tensioned canopy).
+    ridge_z = attach_z + 0.05
+    ridge_pts = [(-pole_x, 0, ridge_z), (-pole_x * 0.5, 0, ridge_z - 0.012),
+                 (0, 0, ridge_z - 0.018), (pole_x * 0.5, 0, ridge_z - 0.012),
+                 (pole_x, 0, ridge_z)]
+    rope_from_curve(bm, ridge_pts, [1.0] * 5, 0.012, IRON, bevel_res=2)
+
+    N_SUPPORTS = 5   # 2 poles + 3 interior tie points -- 4 sag cells between them
+    support_x = [-pole_x + (2 * pole_x) * i / (N_SUPPORTS - 1) for i in range(N_SUPPORTS)]
+
+    def cell_sag(t_glob, dip):
+        cellf = t_glob * (N_SUPPORTS - 1)
+        cell = min(int(cellf), N_SUPPORTS - 2)
+        s_local = cellf - cell
+        return dip * math.sin(math.pi * s_local)
+
+    # r6 passes: 28/18/16 steps all left too little of the already razor-thin
+    # 8,000-tri budget for the ridge rope + hems + tie cords once the global
+    # Bevel modifier's cost (see the hem/tie-loop comments below) is
+    # counted. 14 steps (3.5 segments per sag cell) is the floor that still
+    # avoids a visible triangle-wave on the gentle 0.10 m dip.
+    n_steps = 14
+    dip = 0.10
     thickness = 0.018
     y_half = 0.55
     top_v, bot_v = [], []
     for i in range(n_steps + 1):
         t = i / n_steps
         x = -pole_x + (2 * pole_x) * t
-        sag = dip * math.sin(math.pi * t)
+        sag = cell_sag(t, dip)
         zt = attach_z - sag
         zb = zt - thickness
         top_v.append((bm.verts.new((x, -y_half, zt)), bm.verts.new((x, y_half, zt))))
@@ -296,6 +346,38 @@ def build_canopy(bm):
     # end caps at the two poles, closing the thickness
     bm.faces.new((top_v[0][0], top_v[0][1], bot_v[0][1], bot_v[0][0])).material_index = PLASTER
     bm.faces.new((bot_v[-1][0], bot_v[-1][1], top_v[-1][1], top_v[-1][0])).material_index = PLASTER
+
+    # r6 fixlist 2a: rolled hem tube along both long free edges (-y_half and
+    # +y_half), following the same per-cell sag -- a hem is thicker than
+    # the sheet it borders so the free edge reads as a doubled/rolled
+    # border, not a knife edge.
+    # r6 2nd/3rd pass, root cause found on the 3rd: this object carries a
+    # mesh-wide Bevel modifier (angle_limit=80 deg, see build()) that ADDS a
+    # chamfer to every edge steeper than that threshold. A coarse box-
+    # section beam chain (3rd pass) has ~90 deg corners at every facet AND
+    # at every segment join, so the global bevel modifier MULTIPLIED its
+    # cost instead of saving any -- tri count went UP when the base geometry
+    # got coarser. A properly ROUND rope tube (bevel_res=2, ~12-sided
+    # profile, ~30 deg facet dihedral) stays under the 80 deg threshold, so
+    # the global bevel modifier adds nothing extra to it -- exactly like the
+    # existing (already-budgeted) rope-wrap ties. Round, not coarse, is what
+    # is actually cheap here; fewer POINTS along the sag path (not a
+    # coarser cross-section) is the real budget lever.
+    HEM_SEGS = 6
+    for sy in (-1, 1):
+        hem_pts = []
+        for i in range(HEM_SEGS + 1):
+            t = i / HEM_SEGS
+            x = -pole_x + (2 * pole_x) * t
+            sag = cell_sag(t, dip)
+            hem_pts.append((x, sy * y_half, attach_z - sag - thickness * 0.5))
+        rope_from_curve(bm, hem_pts, [1.0] * len(hem_pts), 0.024, PLASTER, bevel_res=2)
+
+    # r6 fixlist 2a: 3 ridge tie points/grommets, one per interior support
+    # (poles already carry the big rope-wrap ties) -- a small closed cord
+    # loop from the ridge rope down to the canvas top surface at each.
+    for x in support_x[1:-1]:
+        add_tie_loop(bm, x, ridge_z - 0.004, attach_z - 0.002, IRON)
 
 
 def build():
@@ -361,10 +443,26 @@ def render_pass():
     # all). Fixing cross_z in build_trestle to the true intersection also
     # moves the peg here -- this camera target follows it so cam_detail
     # keeps framing the actual joint instead of the old wrong height.
+    # r6 fixlist 2b: RE-AIMED. The r5 crop (0.15, -0.85, lens=50) sat too
+    # close and too square-on to the plate face -- only one flat face with
+    # its bolts was visible, no second leg, which is a failed render (the
+    # frame's job is to show the cross-halved joint, not just the bracket
+    # bolted over it). Pulled back to y=-1.3 and widened to lens=38, target
+    # moved to the strap-plate's own centre (plate_z=0.28, matching
+    # build_trestle) so BOTH crossing legs are visible passing through the
+    # plate in one frame, not just the plate's front face.
+    # r6 2nd pass: the first re-aim (0.05, -1.3) was too CENTRED on the
+    # trestle's own X=x0 plane -- both legs live at the same world X, so a
+    # camera looking almost straight down that plane's normal (small X
+    # offset relative to its Y distance) foreshortens the X-crossing into a
+    # single near-vertical smear, exactly like the failed r5 crop. The wide
+    # shots read the X because they view it OBLIQUELY (camera at x=0,
+    # trestle at x=+-1.02, y=-4.3 -- a large X-offset-to-distance ratio).
+    # Widen the X offset here to preserve that obliqueness at detail range.
     peg_x = LEN / 2 - 0.18
-    peg_z = (COUNTER_H - 0.02) * 0.14 / (0.42 + 0.14)
-    add_camera("cam_detail", (peg_x + 0.15, -0.85, peg_z + 0.05),
-               mathutils.Vector((peg_x, 0, peg_z)), lens=50)
+    plate_z = 0.28
+    add_camera("cam_detail", (peg_x + 0.24, -1.15, plate_z + 0.02),
+               mathutils.Vector((peg_x, 0, plate_z)), lens=40)
     render_to(os.path.join(RENDERS_DIR, "stall_detail.png"))
     # round 3 re-fix: dedicated close-up on the pole-head tie wrap -- at
     # face/34 distance the lashing is only ~20px, not enough to evidence

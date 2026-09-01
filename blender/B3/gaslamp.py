@@ -52,6 +52,21 @@ C.add_cylinder(bm, 0, 0, COL_Y1 - 0.04, COL_Y1, 0.06, segments=20, mat_idx=IRON)
 LADDER_Y = 1.20
 C.add_cylinder(bm, 0, 0, LADDER_Y - 0.03, LADDER_Y + 0.04, 0.075, segments=20, mat_idx=IRON)
 C.add_box(bm, -0.30, 0.30, LADDER_Y - 0.022, LADDER_Y + 0.022, -0.03, 0.03, mat_idx=IRON)
+# round-4 fixlist item 4a: the crossbar appeared to pass straight through
+# the column with nothing fixing it -- a bigger, clearly-stepped collar
+# band (the old one was only 1.5 cm wider than the column, too subtle to
+# read against the fluted taper) plus a straight brace strut under each
+# arm, the way a real cast-iron lamp bracket is fixed.
+C.add_cylinder(bm, 0, 0, LADDER_Y - 0.07, LADDER_Y + 0.09, 0.095, segments=20, mat_idx=IRON)
+C.add_cylinder(bm, 0, 0, LADDER_Y - 0.09, LADDER_Y - 0.07, 0.105, segments=20, mat_idx=IRON)  # collar lip
+for sx in (-1, 1):
+    # L-shaped bracket: a horizontal foot rooted against the collar, and a
+    # vertical riser up to the arm's underside -- genuinely connects the
+    # two instead of floating near the arm.
+    C.add_box(bm, sx * 0.015, sx * 0.155, LADDER_Y - 0.10, LADDER_Y - 0.085,
+              -0.015, 0.015, mat_idx=IRON)
+    C.add_box(bm, sx * 0.17 - 0.015, sx * 0.17 + 0.015, LADDER_Y - 0.10, LADDER_Y - 0.022,
+              -0.015, 0.015, mat_idx=IRON)
 
 # ---- lantern: square glazed chamber on 4 corner posts ----
 LAN_Y0, LAN_Y1 = 1.85, 2.25
@@ -89,6 +104,28 @@ C.add_quad(bm, (gh, gy0, HALF - 0.004), (-gh, gy0, HALF - 0.004),
            (-gh, gy1, HALF - 0.004), (gh, gy1, HALF - 0.004), mat_idx=GLASS)
 C.add_quad(bm, (-HALF + 0.004, gy0, gh), (-HALF + 0.004, gy0, -gh),
            (-HALF + 0.004, gy1, -gh), (-HALF + 0.004, gy1, gh), mat_idx=GLASS)
+
+# round-4 fixlist item 4b: mullions dividing each side into countable
+# panes -- r3 was a smooth glass box with no bars. One vertical + one
+# horizontal glazing bar per side (2x2 = 4 panes/side), proud enough of
+# the glass to cast a shadow.
+gy_mid = (gy0 + gy1) / 2
+MB = 0.010  # bar half-width
+# horizontal bar segments are trimmed to stop short of the vertical bar
+# (picture-frame construction, same fix used throughout this batch) so
+# the two never share volume at the centre crossing.
+for x_face, sgn in ((HALF - 0.004, 1), (-HALF + 0.004, -1)):
+    xf = x_face + sgn * 0.006
+    xa, xb = min(x_face, xf), max(x_face, xf)
+    C.add_box(bm, xa, xb, gy0, gy1, -MB, MB, mat_idx=IRON)  # vertical bar, full height
+    C.add_box(bm, xa, xb, gy_mid - MB, gy_mid + MB, -gh, -MB, mat_idx=IRON)
+    C.add_box(bm, xa, xb, gy_mid - MB, gy_mid + MB, MB, gh, mat_idx=IRON)
+z_face, sgn = HALF - 0.004, 1
+zf = z_face + sgn * 0.006
+za, zb = min(z_face, zf), max(z_face, zf)
+C.add_box(bm, -MB, MB, gy0, gy1, za, zb, mat_idx=IRON)  # vertical bar, full height
+C.add_box(bm, -gh, -MB, gy_mid - MB, gy_mid + MB, za, zb, mat_idx=IRON)
+C.add_box(bm, MB, gh, gy_mid - MB, gy_mid + MB, za, zb, mat_idx=IRON)
 
 # 4th side (front, z=-HALF) is the DOOR, modelled genuinely ajar on a hinge
 # -- not a flat pane. Judge round 1: the clay override makes glass opaque
@@ -189,23 +226,55 @@ CAP_Y0, CAP_Y1 = PLATE_Y1, PLATE_Y1 + 0.13
 CAP_HALF = HALF + 0.05  # 0.20 m, clears the 0.192 m post-corner radius
 VENT_ROT = 45.0
 N_RINGS = 3
-RING_T, GAP_T = 0.018, 0.014
+RING_T, GAP_T = 0.018, 0.030
+# round-4 fixlist item 4c: the r3 gaps used the SAME core radius (HALF)
+# as the plinth/plate below, so the "gap" was just two ring radii meeting
+# a shallow continuous cone -- read as stepped moulding, no actual dark
+# opening. Deepened the gap-only core radius well past that (GAP_CORE_R)
+# and added a thin downward skirt under each of the upper rings, so a
+# camera looking up at the cap sees an actual recessed slot with a hard
+# shadow-casting lip over it, not a smooth taper.
+GAP_CORE_R = HALF - 0.045
 for k in range(N_RINGS):
     ry0 = CAP_Y0 + k * (RING_T + GAP_T)
     ry1 = ry0 + RING_T
     C.add_cylinder(bm, 0, 0, ry0, ry1, CAP_HALF, segments=4, mat_idx=IRON,
                     angle_offset_deg=VENT_ROT)
+    if k < N_RINGS - 1:
+        # deep recessed core strictly within this ring's own gap span
+        gy0, gy1 = ry1, ry1 + GAP_T
+        C.add_cylinder(bm, 0, 0, gy0, gy1, GAP_CORE_R, segments=4, mat_idx=IRON,
+                        angle_offset_deg=VENT_ROT)
+        # round-4 fixlist item 4c continued: the concentric recess alone
+        # still reads as a smooth stepped taper from most angles, the same
+        # complaint as r3. Proud vertical ribs across each of the 4 flat
+        # faces, with real gaps between them exposing the deep recessed
+        # core as shadow, is the same slat-vent technique already proven
+        # to pass on the privy vent this round -- an actual countable
+        # opening, not a moulding profile.
+        rib_w = 0.016
+        rib_positions = (-0.05, 0.0, 0.05)
+        rx0, rx1 = GAP_CORE_R, CAP_HALF - 0.012
+        for p in rib_positions:
+            C.add_box(bm, rx0, rx1, gy0, gy1, p - rib_w / 2, p + rib_w / 2, mat_idx=IRON)
+            C.add_box(bm, -rx1, -rx0, gy0, gy1, p - rib_w / 2, p + rib_w / 2, mat_idx=IRON)
+            C.add_box(bm, p - rib_w / 2, p + rib_w / 2, gy0, gy1, rx0, rx1, mat_idx=IRON)
+            C.add_box(bm, p - rib_w / 2, p + rib_w / 2, gy0, gy1, -rx1, -rx0, mat_idx=IRON)
 BAND_Y1 = CAP_Y0 + N_RINGS * (RING_T + GAP_T) - GAP_T
-C.add_cylinder(bm, 0, 0, CAP_Y0, BAND_Y1, HALF, segments=4, mat_idx=IRON,
-                angle_offset_deg=VENT_ROT)  # recessed core linking the rings,
-                                             # now standing on the sealed plate
+# short transition core, below the first ring and above the last ring
+# only (structural continuity to the plate/roof), at the shallower HALF
+# radius -- unaffected by the deep vent-slot recess above
+C.add_cylinder(bm, 0, 0, CAP_Y0, CAP_Y0 + 0.006, HALF, segments=4, mat_idx=IRON,
+                angle_offset_deg=VENT_ROT)
 C.add_cylinder(bm, 0, 0, BAND_Y1, CAP_Y1, CAP_HALF, segments=4, mat_idx=IRON,
                radius_top=0.015, angle_offset_deg=VENT_ROT)  # roof pyramid
 # finial knob
 C.add_cylinder(bm, 0, 0, CAP_Y1, CAP_Y1 + 0.02, 0.02, segments=10, mat_idx=IRON)
 
 obj = C.new_object("gaslamp", bm, ["iron", "glass"])
-C.add_bevel(obj, width=0.004, segments=2)
+# round-4: bevel segments 2 -> 1 -- the new bracket/mullion/vent-slot
+# geometry pushed this just over the 8k prop budget (8,036) with segments=2.
+C.add_bevel(obj, width=0.004, segments=1)
 C.smart_uv(obj)
 
 bpy.context.view_layer.objects.active = obj
