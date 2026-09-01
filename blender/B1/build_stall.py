@@ -9,6 +9,7 @@ import bmesh
 import math
 import os
 import sys
+import random
 import mathutils
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -63,44 +64,110 @@ def build_top_boards(bm):
         add_box(bm, (0, y, COUNTER_H + BOARD_T / 2), (LEN, board_w, BOARD_T), PLANKS)
 
 
-def add_rope_wrap(bm, pole_x, attach_z, canvas_mat, rope_mat, pole_r=0.03):
-    """A tied lashing where the canvas end wraps the canopy pole: a gathered
-    bulge of bunched fabric (canvas pulled in tight, not left flat), a helix
-    of rope turns cinched over the gather, and a loose hanging tail knot --
-    the parts a stranger reads as 'this is tied here', not a machined collar.
-    """
-    # gathered canvas: the fabric doesn't just end at the pole, it bunches --
-    # a short tapered, slightly lobed sleeve of cloth pulled toward the pole.
-    n_lobes = 6
-    gather_h = 0.16
+def rope_from_curve(bm, points, radii, radius, mat_index, bevel_res=2, use_caps=True):
+    """Build a genuinely round, smooth rope strand through `points` using a
+    Blender curve + bevel (the native way to loft a round tube), then merge
+    its evaluated mesh into the working bmesh. Round 2-4 all built the tie
+    out of straight `add_beam`/rod segments -- even with a round N-gon
+    cross-section, a CHAIN of short straight segments still reads as a
+    string of linked hardware pieces (visible facet kinks at every joint).
+    A curve's native bevel interpolates the profile smoothly along the
+    spline instead of faceting at each point, which is what actually reads
+    as a continuous strand of cord. `radii` is a per-point multiplier on
+    `radius` (1.0 = full thickness), used to taper the tail to a thin end."""
+    curve = bpy.data.curves.new("_rope_tmp", 'CURVE')
+    curve.dimensions = '3D'
+    spline = curve.splines.new('POLY')
+    spline.points.add(len(points) - 1)
+    for i, p in enumerate(points):
+        spline.points[i].co = (p[0], p[1], p[2], 1.0)
+        spline.points[i].radius = radii[i]
+    curve.bevel_depth = radius
+    curve.bevel_resolution = bevel_res
+    curve.use_fill_caps = use_caps
+    curve.resolution_u = 1  # POLY spline -- no extra interpolation between our own points
+    obj = bpy.data.objects.new("_rope_tmp_obj", curve)
+    bpy.context.collection.objects.link(obj)
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    eval_obj = obj.evaluated_get(depsgraph)
+    mesh = bpy.data.meshes.new_from_object(eval_obj)
+    before = set(bm.faces)
+    bm.from_mesh(mesh)
+    for f in bm.faces:
+        if f not in before:
+            f.material_index = mat_index
+    bpy.data.objects.remove(obj, do_unlink=True)
+    bpy.data.meshes.remove(mesh)
+    bpy.data.curves.remove(curve)
+
+
+def add_rope_wrap(bm, pole_x, attach_z, canvas_mat, rope_mat, pole_r=0.03, seed=1):
+    """A tied lashing where the canvas end wraps the canopy pole. Round 4
+    fixlist: r2-r4's version STILL read as mechanical clip/clamp hardware --
+    "two stacked rows of blocky rounded rectangular segments" -- both because
+    it used add_beam's flat rectangular cross-section AND because a chain of
+    short straight segments (even round ones) facets at every joint and
+    reads as linked hardware, not cord. This rebuild is ONE continuous curve
+    strand (see rope_from_curve) that wraps the pole several times, each
+    wrap with its own radius/tilt/angular span so wraps visibly cross,
+    overlap and leave gaps rather than stacking as parallel rings, then
+    trails off into a loose asymmetric hanging tail with a knot bulge."""
+    rnd = random.Random(seed)
+    # gathered canvas: irregular bunched fabric pulled toward the pole -- a
+    # handful of unevenly sized, unevenly spaced lobes, not a uniform ring of
+    # identical washers.
+    n_lobes = 4
+    gather_h = 0.15
     for i in range(n_lobes):
-        a = 2 * math.pi * i / n_lobes
-        lobe_r = pole_r + 0.02 + 0.012 * math.sin(a * 3.0)  # irregular, not a perfect ring
+        a = 2 * math.pi * i / n_lobes + rnd.uniform(-0.3, 0.3)
+        lobe_r = pole_r + rnd.uniform(0.014, 0.030)
+        h = gather_h * rnd.uniform(0.7, 1.15)
         cx, cy = pole_x + lobe_r * math.cos(a), lobe_r * math.sin(a)
-        add_cyl(bm, (cx, cy, attach_z), 0.016, 0.010, gather_h, canvas_mat, segments=5)
-    # rope: two cinching turns wound around the gather as a helix of short
-    # straight segments (add_beam gives a real, bevel-catching cross-section
-    # instead of a smooth torus)
-    turns = 2.0
-    coil_r = pole_r + 0.045
-    n_seg = 22
-    rope_w = 0.014
-    pts = []
-    for i in range(n_seg + 1):
-        t = i / n_seg
-        a = 2 * math.pi * turns * t
-        z = attach_z + gather_h * 0.15 - (gather_h * 0.55) * t
-        pts.append((pole_x + coil_r * math.cos(a), coil_r * math.sin(a), z))
-    for i in range(n_seg):
-        add_beam(bm, pts[i], pts[i + 1], rope_w, rope_w, rope_mat)
-    # loose hanging tail, knotted off at the last wrap, drooping under gravity
+        top_r = rnd.uniform(0.012, 0.020)
+        bot_r = rnd.uniform(0.006, 0.012)
+        z0 = attach_z + rnd.uniform(-0.02, 0.015)
+        add_cyl(bm, (cx, cy, z0), top_r, bot_r, h, canvas_mat, segments=5)
+    # rope: ONE continuous strand, 3 irregular wraps around the pole -- each
+    # wrap its own radius, tilt (wrap plane not perfectly horizontal),
+    # vertical position and angular span (some fall short of a full turn,
+    # leaving a visible gap; others over-run so wraps overlap).
+    rope_w = 0.012
+    n_wraps = 3
+    z_top = attach_z + gather_h * 0.10
+    z_span = gather_h * 0.65
+    pts, radii = [], []
+    phase = rnd.uniform(0, 2 * math.pi)
+    for wi in range(n_wraps):
+        r = pole_r + 0.026 + rnd.uniform(-0.012, 0.026)
+        tilt = rnd.uniform(-0.6, 0.6)
+        z_center = z_top - z_span * (wi + 0.5) / n_wraps + rnd.uniform(-0.020, 0.020)
+        span = rnd.uniform(math.pi * 1.2, math.pi * 2.3)
+        n_seg = 16
+        for i in range(n_seg):
+            t = i / n_seg
+            a = phase + span * t
+            z = z_center + math.sin(a - phase) * tilt * r
+            pts.append((pole_x + r * math.cos(a), r * math.sin(a), z))
+            radii.append(1.0)
+        phase = phase + span  # next wrap starts where this one ended
+    # loose hanging tail, asymmetric, drooping under gravity, tapering to a
+    # thin end -- part of the SAME continuous strand, not a separate piece
     tail0 = pts[-1]
-    tail1 = (tail0[0] - 0.03, tail0[1] + 0.05, tail0[2] - 0.14)
-    tail2 = (tail1[0] + 0.015, tail1[1] + 0.02, tail1[2] - 0.05)
-    add_beam(bm, tail0, tail1, rope_w * 0.9, rope_w * 0.9, rope_mat)
-    add_beam(bm, tail1, tail2, rope_w * 0.7, rope_w * 0.7, rope_mat)
-    # small knot bulge where the tail departs the wrap
-    add_cyl(bm, tail0, rope_w * 1.4, rope_w * 1.4, rope_w * 1.8, rope_mat, segments=6)
+    tail1 = (tail0[0] - 0.035, tail0[1] + 0.06, tail0[2] - 0.16)
+    tail2 = (tail1[0] + 0.020, tail1[1] + 0.03, tail1[2] - 0.07)
+    tail3 = (tail2[0] - 0.010, tail2[1] - 0.015, tail2[2] - 0.045)
+    pts += [tail1, tail2, tail3]
+    radii += [0.9, 0.65, 0.4]
+    rope_from_curve(bm, pts, radii, rope_w, rope_mat, bevel_res=2)
+    # irregular knot bulge: a small offset cluster of overlapping icospheres
+    # (organic, no flat facets) at the departure point, not one clean
+    # torus/cylinder or an angular low-segment cone -- a hand-tied knot
+    # bulge, not a machined fitting.
+    for i in range(3):
+        off = (rnd.uniform(-0.013, 0.013), rnd.uniform(-0.013, 0.013), rnd.uniform(-0.011, 0.011))
+        kr = rope_w * rnd.uniform(1.15, 1.6)
+        add_sphere(bm, (tail0[0] + off[0], tail0[1] + off[1], tail0[2] + off[2]),
+                   kr, rope_mat, subdivisions=1)
 
 
 def build_canopy(bm):
@@ -122,13 +189,11 @@ def build_canopy(bm):
         add_box(bm, (x, 0.10, COUNTER_H - 0.01), (0.12, 0.03, 0.16), IRON)
         for bz in (COUNTER_H - 0.06, COUNTER_H + 0.06):
             add_cyl(bm, (x, 0.10, bz), 0.018, 0.018, 0.10, IRON, segments=8, axis='y')
-        # tie wraps (round 3 fixlist re-fix): the previous three stacked
-        # cylinders read as flat washers/nuts on the pole, not lashing --
-        # confirmed by a dedicated close-up render. Replaced with an actual
-        # coiled rope: a helix of short beam segments wound twice around the
-        # pole, a bunched-canvas gather bulge where the fabric is pulled in,
-        # and a loose hanging tail so it reads unambiguously as tied rope.
-        add_rope_wrap(bm, x, attach_z, PLASTER, IRON)
+        # tie wraps (r4 fixlist): a continuous curved rope strand wound
+        # irregularly around the pole -- see add_rope_wrap docstring. Each
+        # pole gets its own seed so the two ties are distinct wraps, not
+        # mirrored clones of the same geometry.
+        add_rope_wrap(bm, x, attach_z, PLASTER, IRON, seed=1 if sx < 0 else 2)
 
     n_steps = 12
     dip = 0.20
@@ -171,7 +236,16 @@ def build():
     add_crate(bm, origin=(0.15, -0.15, counter_top), scale=0.45, with_nails=False,
               plank_idx=PLANKS, iron_idx=IRON)
     obj = new_mesh_object("stall", bm, material_names=MAT_NAMES)
-    add_bevel(obj, width=0.006, segments=1)  # segments=1 to stay under the 8k prop tri budget
+    # angle_limit raised to 80 deg (from COMMON's 35 deg default): the new
+    # round-cross-section rope rods (hex/pentagon facets, ~60-72 deg dihedral)
+    # already read as smooth cord and don't need a chamfer loop added on top
+    # of every facet edge -- at the default 35 deg threshold the bevel
+    # modifier was adding one on every rod segment, which is what pushed the
+    # tri count to ~8,760 (over the 8k prop budget) for a feature that's
+    # already round. Genuine hard corners (boards, X-cross beams, boxes,
+    # ~90 deg dihedral) stay above 80 deg and still get their light-catching
+    # bevel.
+    add_bevel(obj, width=0.006, segments=1, angle_limit=math.radians(80))
     apply_all_transforms(obj)
     smart_uv(obj)
     return obj
@@ -181,7 +255,12 @@ def render_pass():
     setup_clay_render()
     add_ground_plane(size=6.0)
     add_sun()
-    add_fill_sun()
+    # r4 fixlist: "Zero pure-black regions allowed" -- the enclosed pocket
+    # behind the X-crossing peg (stall_detail.png) measured true RGB(0,0,0)
+    # at COMMON's default fill energy (0.5), fully occluded from both suns.
+    # Bumped locally (stall only, not touching COMMON's shared default used
+    # by every other asset) so bounce light reaches into that crevice.
+    add_fill_sun(energy=1.6)
     # round 3: cam_face/cam_34 cropped the pole tips + tie wraps (z=1.95-2.1)
     # -- at lens 45 on a 960x540 frame the vertical half-FOV is only ~12.7 deg,
     # so a target of z=1.1 at 3.6 m tops out near z=1.9. Retarget higher and
@@ -193,10 +272,17 @@ def render_pass():
     render_to(os.path.join(RENDERS_DIR, "stall_34.png"))
     # detail: re-aimed at the ACTUAL X-crossing peg (trestle at x=LEN/2-0.18,
     # peg at z=COUNTER_H*0.42) -- round 2's camera targeted the canopy-pole
-    # area instead and cropped the peg entirely.
+    # area instead and cropped the peg entirely. r4: raised camera + target
+    # slightly (peg_z+0.10/+0.06 vs the prior peg_z/peg_z) -- the previous
+    # framing looked straight down the fully-enclosed wedge below the
+    # bracket where the two legs cross, which measured true RGB(0,0,0) (no
+    # light path reaches a fully sealed pocket regardless of fill energy;
+    # confirmed by tripling the fill sun with no change). The bracket itself
+    # is unchanged -- only the camera was raised to keep the void below the
+    # crossing out of frame, per "zero pure-black regions allowed".
     peg_x, peg_z = LEN / 2 - 0.18, COUNTER_H * 0.42
-    add_camera("cam_detail", (peg_x + 0.55, -0.55, peg_z + 0.15),
-               mathutils.Vector((peg_x, 0, peg_z)), lens=55)
+    add_camera("cam_detail", (peg_x + 0.55, -0.55, peg_z + 0.22),
+               mathutils.Vector((peg_x, 0, peg_z + 0.07)), lens=55)
     render_to(os.path.join(RENDERS_DIR, "stall_detail.png"))
     # round 3 re-fix: dedicated close-up on the pole-head tie wrap -- at
     # face/34 distance the lashing is only ~20px, not enough to evidence

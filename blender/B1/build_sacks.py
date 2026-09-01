@@ -30,7 +30,7 @@ from common import (
 CLOTH = 0
 MAT_NAMES = ["cloth"]
 
-N_SEG = 36
+N_SEG = 34
 N_RING_BODY = 26
 N_RING_NECK = 8
 
@@ -39,10 +39,10 @@ HALF_H_TOP = 0.145
 HALF_H_BOT = 0.085
 BODY_LEN = 0.68
 NECK_FRAC = 0.34
-NECK_RUN = 0.30
-NECK_LATERAL = 0.22
-NECK_RISE = 0.20
-NECK_DROOP = 0.10
+NECK_RUN = 0.22
+NECK_LATERAL = 0.30
+NECK_RISE = 0.03
+NECK_DROOP = 0.22
 NECK_MIN_R = 0.016
 SPREAD = 1.20
 ENV_FLOOR = 0.05
@@ -58,6 +58,17 @@ COLLAR_HALF_T = 0.006
 # fabric crease instead. Kept wide (tw>=0.08, ~2 body-ring spacings) so
 # N_RING_BODY actually samples the dip smoothly rather than aliasing it.
 FOLDS = [(0.34, 0.09, 0.11), (0.60, 0.08, 0.09)]
+
+# r4 fixlist item 3a: crease/fold geometry at every GROUND-contact point --
+# the body was smooth on the underside, so it read as a pillow resting on
+# nothing rather than cloth pressed flat against the floor. A periodic
+# radius scallop confined to the true underside (weighted by how far past
+# the equator sa is) breaks the flattened base into separated lobes with a
+# crease between each -- the classic grounded-sack silhouette -- at zero
+# added triangle cost (it is a per-vertex radius multiplier on rings that
+# already exist).
+GROUND_CREASE_K = 9.0
+GROUND_CREASE_AMT = 0.30
 
 
 def ring_profile(t):
@@ -85,13 +96,18 @@ def ring_profile(t):
         u = BODY_LEN + tn * NECK_RUN
         if tn < 0.40:
             p = tn / 0.40
-            rad_mult = 1.0 - p * 0.85          # taper down to the pinch (tie point)
+            # r4 fixlist: -0.85 tapered this all the way down to a bare
+            # needle-thin wire before the flatten had any size to work with,
+            # which is what still read as "rod" -- less severe taper keeps
+            # enough cross-section for the anisotropic flatten (below) to be
+            # visible as a flat pinched tab instead of a thin round wire.
+            rad_mult = 1.0 - p * 0.55          # taper down to the pinch (tie point)
         elif tn < 0.65:
             p = (tn - 0.40) / 0.25
-            rad_mult = 0.15 + p * 0.35          # bulge back out -- gathered ear base
+            rad_mult = 0.45 + p * 0.35          # bulge back out -- gathered ear base (continuous with the 0.45 above)
         else:
             p = (tn - 0.65) / 0.35
-            rad_mult = 0.50 - p * 0.36          # taper to the ear's rounded tip
+            rad_mult = 0.80 - p * 0.36          # taper to the ear's rounded tip
         rad_mult = max(rad_mult, 0.12)
         # max(), not +floor -- an always-added floor is discontinuous with
         # the body's un-floored value right at tn=0 (the shoulder seam).
@@ -103,23 +119,37 @@ def ring_profile(t):
         flat_ratio = HALF_H_BOT / HALF_H_TOP
         round_out = min(tn / 0.30, 1.0)
         h_bot = h_top * (flat_ratio + (1.0 - flat_ratio) * round_out)
+        # r4 fixlist: the neck terminus read as "a thin curved rod ending in
+        # a blob" -- a handle, not tied cloth. Gating the flattening to only
+        # the post-collar ear (tn>0.40) left the pre-collar taper a long,
+        # thin, perfectly ROUND wire, which is exactly what still read as
+        # "rod" even with a flatter tip. Apply the anisotropic flatten
+        # (width GROWS, height SHRINKS) across the WHOLE neck run starting
+        # immediately at tn=0, so even the thin pinch is a flat pinched tab
+        # of cloth, not a round wire -- a floppy tied cloth end throughout,
+        # not a rod with a flag stuck on the end.
+        fp = min(tn / 0.35, 1.0)
+        width_r *= 1.0 + 1.3 * fp
+        h_top *= 1.0 - 0.62 * fp
+        h_bot *= 1.0 - 0.48 * fp
         bend_w = tn * NECK_LATERAL
-        if tn < 0.65:
-            bend_z = (tn / 0.65) * NECK_RISE
+        if tn < 0.55:
+            bend_z = (tn / 0.55) * NECK_RISE
         else:
-            bend_z = NECK_RISE - (tn - 0.65) / 0.35 * NECK_DROOP  # floppy: rises then flops
+            bend_z = NECK_RISE - (tn - 0.55) / 0.45 * NECK_DROOP  # flops sideways and down, not up
     return u, bend_w, bend_z, width_r, h_top, h_bot
 
 
 def build_sack(bm, cx, cy, s, body_deg, tail_z0=None, sag=0.0,
-               spread_mult=1.0, underside_scale=1.0, dents=None):
+               spread_mult=1.0, underside_scale=1.0, dents=None, crease_phase=0.0):
     """One sack as a single continuous loft. tail_z0 overrides the resting
     height (used to stack a sack on top of others instead of the ground);
     sag bows the body downward at mid-length (draping over what it rests
     on); underside_scale < 1 stiffens/flattens the underside further for a
     sack resting on lumpy neighbours rather than flat ground; dents is a
     list of (t_center, angle_center, t_width, angle_width, amount) localised
-    squashes from a neighbour pressing in."""
+    squashes from a neighbour pressing in; crease_phase offsets the ground-
+    contact scallop so multiple sacks don't share identical creases."""
     dents = dents or []
     rad = math.radians(body_deg)
     Lx, Ly = math.cos(rad), math.sin(rad)
@@ -193,11 +223,26 @@ def build_sack(bm, cx, cy, s, body_deg, tail_z0=None, sag=0.0,
                     g = math.exp(-((t - tc) / tw) ** 2)
                     weight = 0.3 + 0.7 * max(0.0, sa)
                     mult *= 1 - amt * g * weight
+                # ground-contact scallop (r4 fixlist 3a): confined to the
+                # true underside (weighted by how far past the equator sa
+                # is), a periodic dip breaks the flattened base into
+                # separated lobes with a crease between each.
+                contact_w = max(0.0, -sa) ** 2
+                scallop = 1.0 - GROUND_CREASE_AMT * contact_w * (
+                    0.5 + 0.5 * math.sin(GROUND_CREASE_K * t * 2 * math.pi + crease_phase))
+                mult *= scallop
             if not is_collar:
                 for (dtc, dac, dtw, daw, damt) in dents:
                     da = (a - dac + math.pi) % (2 * math.pi) - math.pi
                     g = math.exp(-((t - dtc) / dtw) ** 2) * math.exp(-(da / daw) ** 2)
-                    mult *= 1 - damt * g
+                    # r4 fixlist 3b: a plain gaussian dip alone reads as a
+                    # smooth push, not a crease. Flank the dip with a slight
+                    # raised rim (a difference-of-gaussians) so the boundary
+                    # where the two bodies meet shows a fold line, and pull
+                    # the dip deeper so the two surfaces meet close to
+                    # tangentially instead of visibly passing through.
+                    g_rim = math.exp(-((t - dtc) / (dtw * 1.7)) ** 2) * math.exp(-(da / (daw * 1.7)) ** 2)
+                    mult *= (1 - damt * g) * (1 + damt * 0.30 * max(0.0, g_rim - g))
             local_w = width_r * s * wscale * mult
             local_h = hr * s * mult
             pos = ring_center + local_u * (local_w * ca) + local_v * (local_h * sa)
@@ -252,14 +297,23 @@ def build():
     # round 3's first pass only dented for the top sack's weight, so the two
     # ground sacks had no crease where THEY touch, which is exactly the
     # "crease/fold geometry at every contact" the fixlist asks for.
+    # r4 fixlist 3b: round 3's dents only pressed DOWN into sacks 1/2 from
+    # sack 3's weight -- sack 3 itself had no matching dent where ITS
+    # underside meets the mounds of 1/2, so the contact read as overlap, not
+    # mutual squash ("they overlap but do not deform each other"). Sack 3's
+    # tail end (t near 0) sits toward sack 1 (body_deg=100 points its t=0
+    # end back toward c1), its shoulder end (t near 0.75) toward sack 2 --
+    # give it its own underside (angle -pi/2 = sa=-1) dents at both.
     dents1 = [(0.55, math.pi / 2, 0.16, 1.1, 0.34), (0.72, 0.0, 0.14, 0.9, 0.16)]
     dents2 = [(0.45, math.pi / 2, 0.16, 1.1, 0.32), (0.30, math.pi, 0.14, 0.9, 0.16)]
+    dents3 = [(0.14, -math.pi / 2, 0.16, 1.1, 0.30), (0.74, -math.pi / 2, 0.16, 1.1, 0.28)]
 
-    build_sack(bm, c1[0], c1[1], s1, body_deg=18, dents=dents1)
-    build_sack(bm, c2[0], c2[1], s2, body_deg=-70, dents=dents2)
+    build_sack(bm, c1[0], c1[1], s1, body_deg=18, dents=dents1, crease_phase=0.0)
+    build_sack(bm, c2[0], c2[1], s2, body_deg=-70, dents=dents2, crease_phase=2.4)
     build_sack(bm, (c1[0] + c2[0]) / 2.0 + 0.02, (c1[1] + c2[1]) / 2.0 - 0.01, s3,
                body_deg=100, tail_z0=(top1 + top2) / 2.0 + 0.03 * s3,
-               sag=0.09, spread_mult=1.15, underside_scale=0.55)
+               sag=0.09, spread_mult=1.15, underside_scale=0.55,
+               dents=dents3, crease_phase=4.8)
 
     obj = new_mesh_object("sacks", bm, material_names=MAT_NAMES)
     # no bevel: cloth has no hard edges, and the folds/collar/dents are
@@ -284,7 +338,12 @@ def render_pass():
     render_to(os.path.join(RENDERS_DIR, "sacks_face.png"))
     add_camera("cam_34", (1.9, -2.0, 1.4), tgt, lens=42)
     render_to(os.path.join(RENDERS_DIR, "sacks_34.png"))
-    # detail: sack 1's neck -- pinch + proud tie collar + floppy ear
+    # detail: sack 1's neck -- pinch + proud tie collar + floppy tied end
+    # (r4: reshaped per fixlist item 3c -- flattened cross-section from the
+    # pinch onward, shorter run, more droop -- retested with sack 2's tail
+    # first, but every close angle tried there caught the flap nearly
+    # face-on as a flat white panel; sack 1 at the original framing shows
+    # the pinch-to-frill transition and body context together).
     add_camera("cam_detail", (-0.55, -0.85, 0.55), mathutils.Vector((-0.32, -0.15, 0.42)), lens=45)
     render_to(os.path.join(RENDERS_DIR, "sacks_detail.png"))
 
