@@ -43,17 +43,9 @@ def build_trestle(bm, x0):
     # -- fattened from the round-1 size (0.018 r) so it actually reads at
     # render distance, plus a small square washer against each leg face
     cross_z = COUNTER_H * 0.42
-    # r6: the axis-aligned peg/washer stack only approximately met the two
-    # DIAGONAL crossed legs, leaving a hairline sealed gap at their true
-    # intersection -- from the stall_34 camera angle that gap had literally
-    # no line-of-sight to any sun (confirmed: tripling samples to 128 and
-    # adding a second fill light from a third azimuth left it exactly as
-    # black). Fattened the peg and deepened the washers so they clearly
-    # overlap into both leg beams with margin, sealing the gap with geometry
-    # instead of chasing it with more light.
-    add_cyl(bm, (x0, 0, cross_z), 0.036, 0.036, 0.16, IRON, segments=8, axis='y')
+    add_cyl(bm, (x0, 0, cross_z), 0.03, 0.03, 0.16, IRON, segments=8, axis='y')
     for sy in (-1, 1):
-        add_box(bm, (x0, sy * 0.065, cross_z), (0.075, 0.022, 0.075), IRON)
+        add_box(bm, (x0, sy * 0.065, cross_z), (0.06, 0.012, 0.06), IRON)
     # stretcher rail low down, ties the splayed feet together (also the "side
     # rail" hand-rail the brief calls for)
     add_beam(bm, (x0, -bot_y, 0.18), (x0, bot_y, 0.18), 0.04, 0.03, PLANKS)
