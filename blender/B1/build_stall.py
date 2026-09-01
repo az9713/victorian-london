@@ -42,10 +42,39 @@ def build_trestle(bm, x0):
     # peg at the crossing point (legs cross halfway up -- cross-halved joint)
     # -- fattened from the round-1 size (0.018 r) so it actually reads at
     # render distance, plus a small square washer against each leg face
-    cross_z = COUNTER_H * 0.42
+    # r6: root cause of stall_34's true-black pixels, finally found by
+    # raycasting the exact camera ray in Python (not guessing from renders):
+    # cross_z was COUNTER_H*0.42=0.378, but the legs (top_y=0.42/bot_y=0.14,
+    # z 0.0-0.88) actually cross in Y at z = z_top*bot_y/(top_y+bot_y) =
+    # 0.88*0.14/0.56 = 0.22 -- 0.158 m below where the peg/washers were
+    # placed. The peg never covered the real joint; the two beams'
+    # uncovered interpenetration seam there produced a sealed, zero-light
+    # sliver from a narrow range of angles that no amount of fill light or
+    # samples (tried up to 128 + a second fill + 5x world strength -- none
+    # moved the pixel count) could reach, because it has no aperture at all.
+    cross_z = (COUNTER_H - 0.02) * bot_y / (top_y + bot_y)
     add_cyl(bm, (x0, 0, cross_z), 0.03, 0.03, 0.16, IRON, segments=8, axis='y')
+    # r6: enlarged from a small square washer (0.06x0.012x0.06) to an iron
+    # strap plate -- the two crossed legs are separate, non-boolean meshes
+    # that don't perfectly interpenetrate along their shared seam, leaving a
+    # hairline gap that read as true black from any angle showing through it
+    # (see cross_z fix above). A real strap-plate bracket bolted across the
+    # joint is period-appropriate ironwork AND physically covers the seam
+    # above and below the peg, instead of chasing a camera angle that hides
+    # it. Centred slightly above cross_z (0.28 vs 0.22) and shortened to
+    # 0.44 m tall so it stays clear of the ground (0.62 m centred on 0.22
+    # ran from z=-0.09 to 0.53, poking 9 cm below the floor).
+    plate_z = 0.28
+    plate_h = 0.44
     for sy in (-1, 1):
-        add_box(bm, (x0, sy * 0.065, cross_z), (0.06, 0.012, 0.06), IRON)
+        add_box(bm, (x0, sy * 0.06, plate_z), (0.20, 0.03, plate_h), IRON)
+        # bolt nubs -- a bare slab reads as a placeholder, not fixed
+        # hardware. Four proud rivet/bolt heads through the plate face,
+        # same pattern as the canopy-pole socket clamp's bolt nubs above.
+        for dx in (-0.06, 0.06):
+            for dz in (-0.15, 0.15):
+                add_cyl(bm, (x0 + dx, sy * 0.06, plate_z + dz), 0.012, 0.012,
+                        0.05, IRON, segments=8, axis='y')
     # stretcher rail low down, ties the splayed feet together (also the "side
     # rail" hand-rail the brief calls for)
     add_beam(bm, (x0, -bot_y, 0.18), (x0, bot_y, 0.18), 0.04, 0.03, PLANKS)
@@ -301,16 +330,7 @@ def build():
 
 
 def render_pass():
-    # r6: stall_34.png measured a true-black diamond (54 px, RGB(0,0,0)) in
-    # the far trestle's leg-crossing peg pocket -- a near-zero-clearance
-    # wedge between the two 0.05x0.05 crossed legs and the 0.03r peg/washer
-    # stack, geometrically sealed from every straight sun-ray direction and
-    # reached (if at all) only by multi-bounce GI. A second directional fill
-    # (tried below) made no measurable difference -- confirming the gap has
-    # no direct line of sight to ANY single distant sun, only indirect
-    # bounce. Raising samples so indirect diffuse actually resolves that
-    # bounce path instead of the denoiser flooring low-confidence noise to 0.
-    setup_clay_render(samples=128)
+    setup_clay_render()
     add_ground_plane(size=6.0)
     add_sun()
     # r4 fixlist: "Zero pure-black regions allowed" -- the enclosed pocket
@@ -319,10 +339,6 @@ def render_pass():
     # Bumped locally (stall only, not touching COMMON's shared default used
     # by every other asset) so bounce light reaches into that crevice.
     add_fill_sun(energy=1.6)
-    # second fill from a third azimuth (opposite side, quartering angle) --
-    # kept alongside the 128-sample bump above; between the two, whichever
-    # pocket either light's first bounce misses, the other's GI contributes.
-    add_fill_sun(name="Fill2", energy=1.2, angle=(math.radians(100), 0, math.radians(160)))
     # round 3: cam_face/cam_34 cropped the pole tips + tie wraps (z=1.95-2.1)
     # -- at lens 45 on a 960x540 frame the vertical half-FOV is only ~12.7 deg,
     # so a target of z=1.1 at 3.6 m tops out near z=1.9. Retarget higher and
@@ -332,19 +348,23 @@ def render_pass():
     render_to(os.path.join(RENDERS_DIR, "stall_face.png"))
     add_camera("cam_34", (3.1, -3.3, 1.7), tgt, lens=45)
     render_to(os.path.join(RENDERS_DIR, "stall_34.png"))
-    # detail: re-aimed at the ACTUAL X-crossing peg (trestle at x=LEN/2-0.18,
-    # peg at z=COUNTER_H*0.42) -- round 2's camera targeted the canopy-pole
-    # area instead and cropped the peg entirely. r4: raised camera + target
-    # slightly (peg_z+0.10/+0.06 vs the prior peg_z/peg_z) -- the previous
-    # framing looked straight down the fully-enclosed wedge below the
-    # bracket where the two legs cross, which measured true RGB(0,0,0) (no
-    # light path reaches a fully sealed pocket regardless of fill energy;
-    # confirmed by tripling the fill sun with no change). The bracket itself
-    # is unchanged -- only the camera was raised to keep the void below the
-    # crossing out of frame, per "zero pure-black regions allowed".
-    peg_x, peg_z = LEN / 2 - 0.18, COUNTER_H * 0.42
-    add_camera("cam_detail", (peg_x + 0.55, -0.55, peg_z + 0.22),
-               mathutils.Vector((peg_x, 0, peg_z + 0.07)), lens=55)
+    # detail: re-aimed at the ACTUAL X-crossing peg (trestle at x=LEN/2-0.18).
+    # r6: peg_z was COUNTER_H*0.42=0.378, which is NOT where the legs (top_y
+    # 0.42/bot_y 0.14, z 0-0.88) actually cross in Y -- see build_trestle's
+    # r6 comment. Traced stall_34's true-black pixels to this exact bug via
+    # a Python raycast against the saved .blend: the peg/washers were
+    # covering empty air 0.158 m above the real joint, leaving the two
+    # crossing beams' interpenetration seam uncovered and, from a narrow
+    # range of angles, sealed with zero light path (confirmed by testing up
+    # to 128 samples, a second fill light, and 5x world strength -- none
+    # changed the pixel count, because there was no aperture to reach at
+    # all). Fixing cross_z in build_trestle to the true intersection also
+    # moves the peg here -- this camera target follows it so cam_detail
+    # keeps framing the actual joint instead of the old wrong height.
+    peg_x = LEN / 2 - 0.18
+    peg_z = (COUNTER_H - 0.02) * 0.14 / (0.42 + 0.14)
+    add_camera("cam_detail", (peg_x + 0.15, -0.85, peg_z + 0.05),
+               mathutils.Vector((peg_x, 0, peg_z)), lens=50)
     render_to(os.path.join(RENDERS_DIR, "stall_detail.png"))
     # round 3 re-fix: dedicated close-up on the pole-head tie wrap -- at
     # face/34 distance the lashing is only ~20px, not enough to evidence

@@ -153,6 +153,28 @@ def door_zface(face_z, sign, xc, width=1.1, leaf_height=1.95, recess=WALL_THICK)
     # door handle/knob, proud of the leaf
     C.add_cylinder(bm, xr - 0.12, rz - sign * 0.09, y0 + 1.0, y0 + 1.08, 0.02,
                     segments=8, mat_idx=PAINT_DARK)
+    # round-4 fixlist item 2b: a knob alone isn't two distinct objects -- a
+    # separate escutcheon/keyhole plate near it, with its own small
+    # keyhole mark, is what makes "knob AND keyhole" countable as two
+    # things rather than one blob.
+    esc_y = y0 + 0.72
+    esc_z0, esc_z1 = min(rz - sign * 0.015, rz - sign * 0.03), max(rz - sign * 0.015, rz - sign * 0.03)
+    C.add_box(bm, xr - 0.17, xr - 0.07, esc_y - 0.06, esc_y + 0.06, esc_z0, esc_z1, mat_idx=PAINT_DARK)
+    C.add_cylinder(bm, xr - 0.12, rz - sign * 0.033, esc_y - 0.018, esc_y - 0.004, 0.009,
+                    segments=8, mat_idx=PAINT_DARK)  # keyhole
+
+    # strap hinges on the xl edge (opposite the handle), each with 3
+    # stacked knuckle segments -- round-4 fixlist item 2b: r3 showed a
+    # single hinge-like blob, not 2+ hinges with countable knuckles.
+    strap_span = width * 0.32
+    for hy0, hy1 in ((y0 + 0.15, y0 + 0.30), (y_head - 0.30, y_head - 0.15)):
+        hy_mid = (hy0 + hy1) / 2
+        sz0, sz1 = min(fz_leaf, fz_leaf - sign * 0.015), max(fz_leaf, fz_leaf - sign * 0.015)
+        C.add_box(bm, xl, xl + strap_span, hy0, hy1, sz0, sz1, mat_idx=PAINT_DARK)
+        knuckle_z = fz_leaf - sign * 0.035  # clear of the strap's own z-range
+        for dy in (-0.06, 0.0, 0.06):
+            C.add_cylinder(bm, xl - 0.022, knuckle_z, hy_mid + dy - 0.022,
+                            hy_mid + dy + 0.022, 0.022, segments=8, mat_idx=PAINT_DARK)
 
     # single full-width worn stone step (the bevel modifier gives it a
     # rounded, worn-looking nosing at render time)
@@ -180,9 +202,26 @@ def window_zface(face_z, sign, xc, y_sill, y_lintel, width=1.1, recess=WALL_THIC
     # looked through the unclosed bottom into the hollow behind the wall.
     C.add_quad(bm, (xl, y_sill, rz), (xr, y_sill, rz), (xr, y_sill, face_z),
                (xl, y_sill, face_z), mat_idx=BRICK)
-    C.add_box(bm, xl - 0.05, xr + 0.05, y_sill - 0.05, y_sill,
-              min(face_z, face_z - sign * 0.08), max(face_z, face_z - sign * 0.08),
-              mat_idx=BRICK)  # proud sill
+    # round-4 fixlist item 2a: sill needs to project far enough to throw a
+    # visible shadow line (target >=40 mm) with a drip/throat underside.
+    # Built as two tiers -- a main block PLUS a further nosing lip along
+    # its bottom edge that stands proud of the block above it -- so the
+    # step between the two tiers reads as a shadow break, not just a flat
+    # proud slab.
+    SILL_PROUD = 0.10
+    NOSE_PROUD = SILL_PROUD + 0.03
+    C.add_box(bm, xl - 0.05, xr + 0.05, y_sill - 0.06, y_sill,
+              min(face_z, face_z - sign * SILL_PROUD), max(face_z, face_z - sign * SILL_PROUD),
+              mat_idx=BRICK)  # main sill block
+    C.add_box(bm, xl - 0.05, xr + 0.05, y_sill - 0.025, y_sill,
+              min(face_z, face_z - sign * NOSE_PROUD), max(face_z, face_z - sign * NOSE_PROUD),
+              mat_idx=BRICK)  # drip nosing, proud of the block above it
+    # proud lintel/arch head above the opening -- round-4 fixlist item 2a:
+    # the recess soffit alone (flush with the reveal) doesn't read as a
+    # built member carrying load; this stands forward of the wall face.
+    C.add_box(bm, xl - 0.05, xr + 0.05, y_lintel, y_lintel + 0.12,
+              min(face_z, face_z - sign * 0.05), max(face_z, face_z - sign * 0.05),
+              mat_idx=BRICK)
     if boarded:
         # discrete planks nailed across the opening, with real gaps between
         # them (round 2: the "boarded" window was one filled slab, so the
@@ -208,14 +247,22 @@ def window_zface(face_z, sign, xc, y_sill, y_lintel, width=1.1, recess=WALL_THIC
     else:
         C.add_quad(bm, (xl, y_sill, rz), (xr, y_sill, rz), (xr, y_lintel, rz),
                    (xl, y_lintel, rz), mat_idx=PAINT_DARK)  # dark glazing recess
-        # simple sash glazing bars
-        xm = xc
-        ym = (y_sill + y_lintel) / 2
+        # round-4 fixlist item 2a rebuild: a full 6-over-6 glazing-bar grid
+        # (3 columns x 4 rows = 12 panes) instead of one off-centre L-shaped
+        # bar. Meeting rail (thicker, where the two sashes overlap) plus one
+        # internal divider per sash gives 4 rows; 2 vertical dividers give
+        # 3 columns.
+        ym = (y_sill + y_lintel) / 2  # meeting rail
+        row_lower = y_sill + (ym - y_sill) / 2
+        row_upper = ym + (y_lintel - ym) / 2
+        col_xs = [xl + (xr - xl) * i / 3 for i in (1, 2)]
         bar_z = rz - sign * 0.015
-        C.add_box(bm, xm - 0.015, xm + 0.015, y_sill, y_lintel,
-                  min(bar_z, bar_z - sign * 0.01), max(bar_z, bar_z - sign * 0.01), mat_idx=PAINT_DARK)
-        C.add_box(bm, xl, xr, ym - 0.015, ym + 0.015,
-                  min(bar_z, bar_z - sign * 0.01), max(bar_z, bar_z - sign * 0.01), mat_idx=PAINT_DARK)
+        bz0, bz1 = min(bar_z, bar_z - sign * 0.01), max(bar_z, bar_z - sign * 0.01)
+        for cx in col_xs:
+            C.add_box(bm, cx - 0.012, cx + 0.012, y_sill, y_lintel, bz0, bz1, mat_idx=PAINT_DARK)
+        for hy in (row_lower, row_upper):
+            C.add_box(bm, xl, xr, hy - 0.012, hy + 0.012, bz0, bz1, mat_idx=PAINT_DARK)
+        C.add_box(bm, xl, xr, ym - 0.022, ym + 0.022, bz0, bz1, mat_idx=PAINT_DARK)  # meeting rail
 
 
 def string_course(face_z, x0, x1, y):
@@ -410,31 +457,93 @@ PRIVY_X0, PRIVY_X1 = COURT_WALL_X0 - 1.6, COURT_WALL_X0 - 0.1
 PRIVY_Z0, PRIVY_Z1 = FRONT_Z1 + 0.2, FRONT_Z1 + 1.6
 PRIVY_Y_LOW, PRIVY_Y_HIGH = 0.0, 2.3
 C.add_box(bm, PRIVY_X0, PRIVY_X1, PRIVY_Y_LOW, 1.9, PRIVY_Z0, PRIVY_Z1, mat_idx=PLANKS)
-# lean-to roof: single pitched slope from wall (high) to front (low), post at front
-v0 = bm.verts.new(C.V(PRIVY_X0, 1.9, PRIVY_Z0))
-v1 = bm.verts.new(C.V(PRIVY_X1, PRIVY_Y_HIGH, PRIVY_Z0))
-v2 = bm.verts.new(C.V(PRIVY_X1, PRIVY_Y_HIGH, PRIVY_Z1))
-v3 = bm.verts.new(C.V(PRIVY_X0, 1.9, PRIVY_Z1))
-f = bm.faces.new((v0, v1, v2, v3))
-f.material_index = SLATE
+
+# round-4 fixlist item 2c: the roof was a single zero-thickness quad with
+# no overhang past the walls -- reads as a lid, not a roof. Rebuilt with a
+# real overhang on all 4 sides and real slab thickness (top + underside +
+# fascia edges), so it casts an actual shadow on the wall below it, same
+# construction family as the main building's roof_and_parapet.
+ROOF_OVER = 0.15
+ROOF_T = 0.035
+rx0, rx1 = PRIVY_X0 - ROOF_OVER, PRIVY_X1 + ROOF_OVER
+rz0, rz1 = PRIVY_Z0 - ROOF_OVER, PRIVY_Z1 + ROOF_OVER
+top_lo_y, top_hi_y = 1.9 + 0.05, PRIVY_Y_HIGH + 0.05  # lifted clear of the wall top
+v_lo0 = bm.verts.new(C.V(rx0, top_lo_y, rz0))
+v_lo1 = bm.verts.new(C.V(rx0, top_lo_y, rz1))
+v_hi0 = bm.verts.new(C.V(rx1, top_hi_y, rz0))
+v_hi1 = bm.verts.new(C.V(rx1, top_hi_y, rz1))
+bm.faces.new((v_lo0, v_hi0, v_hi1, v_lo1)).material_index = SLATE  # top slope
+u_lo0 = bm.verts.new(C.V(rx0, top_lo_y - ROOF_T, rz0))
+u_lo1 = bm.verts.new(C.V(rx0, top_lo_y - ROOF_T, rz1))
+u_hi0 = bm.verts.new(C.V(rx1, top_hi_y - ROOF_T, rz0))
+u_hi1 = bm.verts.new(C.V(rx1, top_hi_y - ROOF_T, rz1))
+bm.faces.new((u_lo1, u_hi1, u_hi0, u_lo0)).material_index = SLATE  # underside
+# fascia edges closing the roof's own thickness at all 4 overhanging sides
+bm.faces.new((v_lo0, v_lo1, u_lo1, u_lo0)).material_index = SLATE  # low (wall) edge
+bm.faces.new((v_hi1, v_hi0, u_hi0, u_hi1)).material_index = SLATE  # high (front) edge
+bm.faces.new((v_lo1, v_hi1, u_hi1, u_lo1)).material_index = SLATE  # z1 edge
+bm.faces.new((v_hi0, v_lo0, u_lo0, u_hi0)).material_index = SLATE  # z0 edge
+
 C.add_cylinder(bm, PRIVY_X0 + 0.06, PRIVY_Z0 + 0.06, 0, 1.9, 0.05, segments=8, mat_idx=PLANKS)
 C.add_cylinder(bm, PRIVY_X0 + 0.06, PRIVY_Z1 - 0.06, 0, 1.9, 0.05, segments=8, mat_idx=PLANKS)
-# door in privy front (facing -x, toward courtyard open side)
-C.add_box(bm, PRIVY_X0 - 0.03, PRIVY_X0 + 0.02, 0.05, 1.75,
-          PRIVY_Z0 + 0.2, PRIVY_Z1 - 0.2, mat_idx=PAINT_DARK)
+
+# round-4 fixlist item 2c: a vent -- a gap/slot/louvre near the top, high
+# on the courtyard-facing wall (X0 face, the same face as the door), built
+# as a real opening (dark recess) with 3 proud angled louvre slats and
+# real shadow gaps between them, not a decorative groove.
+VENT_Y0, VENT_Y1 = 1.55, 1.78
+VENT_Z0, VENT_Z1 = PRIVY_Z0 + 0.35, PRIVY_Z0 + 0.85
+# 3 proud louvre slats standing off the wall's own face -- the wall's
+# existing solid front face (already built above, at x=PRIVY_X0) shows
+# through the gaps between them as the shadowed recess floor, so no
+# separate backing plane is needed (avoids stacking a second coincident
+# face exactly on top of the wall's own, the same bug class fixed in
+# gy-flank this round).
+n_slats = 3
+slat_h = (VENT_Y1 - VENT_Y0) / n_slats
+for k in range(n_slats):
+    sy0 = VENT_Y0 + k * slat_h + 0.015
+    sy1 = VENT_Y0 + (k + 1) * slat_h
+    C.add_box(bm, PRIVY_X0 - 0.035, PRIVY_X0, sy0, sy1, VENT_Z0, VENT_Z1, mat_idx=PLANKS)
+
+# door in privy front (facing -x, toward courtyard open side), with a
+# hinge (strap + knuckles) and a latch -- round-4 fixlist item 2c: r3's
+# door was a flat slab with no hardware.
+DOOR_Z0, DOOR_Z1 = PRIVY_Z0 + 0.2, PRIVY_Z1 - 0.2
+C.add_box(bm, PRIVY_X0 - 0.03, PRIVY_X0 + 0.02, 0.05, 1.75, DOOR_Z0, DOOR_Z1, mat_idx=PAINT_DARK)
+for hy0, hy1 in ((0.25, 0.42), (1.40, 1.57)):
+    hy_mid = (hy0 + hy1) / 2
+    C.add_box(bm, PRIVY_X0 - 0.05, PRIVY_X0 - 0.03, hy0, hy1, DOOR_Z0, DOOR_Z0 + 0.18, mat_idx=PAINT_DARK)
+    for dy in (-0.05, 0.05):
+        C.add_cylinder(bm, PRIVY_X0 - 0.06, DOOR_Z0 - 0.015, hy_mid + dy - 0.02,
+                        hy_mid + dy + 0.02, 0.018, segments=8, mat_idx=PAINT_DARK)
+latch_y = 1.0
+C.add_box(bm, PRIVY_X0 - 0.07, PRIVY_X0 - 0.03, latch_y - 0.025, latch_y + 0.025,
+          DOOR_Z1 - 0.14, DOOR_Z1 - 0.03, mat_idx=PAINT_DARK)
 
 # ---- standpipe against the court wall ----
 SP_X, SP_Z = COURT_WALL_X0 - 0.05, FRONT_Z1 + 2.4
 C.add_cylinder(bm, SP_X, SP_Z, 0.0, 1.1, 0.045, segments=10, mat_idx=PAINT_DARK)
 C.add_box(bm, SP_X - 0.06, SP_X + 0.02, 1.02, 1.10, SP_Z - 0.05, SP_Z + 0.20, mat_idx=PAINT_DARK)  # spout
-C.add_cylinder(bm, SP_X - 0.02, SP_Z, 1.12, 1.18, 0.035, segments=8, mat_idx=PAINT_DARK)  # tap handle
+# round-4 fixlist item 2d: a 0.06 m stub cylinder reads as a nub, not
+# something a hand could turn. A valve collar plus a horizontal cross-
+# handle a person could actually grip, with real thickness.
+C.add_cylinder(bm, SP_X, SP_Z, 1.10, 1.16, 0.055, segments=10, mat_idx=PAINT_DARK)  # valve collar
+C.add_box(bm, SP_X - 0.16, SP_X + 0.16, 1.155, 1.19, SP_Z - 0.025, SP_Z + 0.025, mat_idx=PAINT_DARK)  # cross-handle
+C.add_box(bm, SP_X - 0.03, SP_X + 0.03, 1.155, 1.19, SP_Z - 0.16, SP_Z + 0.16, mat_idx=PAINT_DARK)  # crossbar, other axis
 C.add_box(bm, SP_X - 0.10, SP_X + 0.10, 0.0, 0.08, SP_Z - 0.10, SP_Z + 0.10, mat_idx=BRICK)  # base pad
 # wall bracket fixing the standpipe
 C.add_box(bm, COURT_WALL_X0 - 0.08, SP_X + 0.02, 0.55, 0.62, SP_Z - 0.03, SP_Z + 0.03,
           mat_idx=PAINT_DARK)
 
 obj = C.new_object("rookery", bm, MATS)
-C.add_bevel(obj, width=0.015, segments=2)
+# round-4: dropped bevel segments 2 -> 1 (fallback the advisor flagged
+# ahead of time) -- the round-4 additions (full glazing-bar grids on every
+# sash, hinge/escutcheon hardware on every door, privy roof+vent, standpipe
+# handle) pushed the evaluated tri count from 52,668 to well over the 60k
+# building budget with segments=2; the edges these small parts add still
+# catch light fine with a single bevel segment.
+C.add_bevel(obj, width=0.015, segments=1)
 C.smart_uv(obj)
 
 bpy.context.view_layer.objects.active = obj

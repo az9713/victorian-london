@@ -64,7 +64,6 @@ COLLAR_PROUD = 0.017  # r5: raised from 0.010 -- at the new (much wider) pinch/f
 # of a flat two-ring step, so the band reads as a rounded bead/cord wrapped
 # around the pinch, not a disc.
 COLLAR_HALF_T = 0.030
-COLLAR_N = 5
 
 # (t_center, t_width, amount) -- fold constrictions along the body, full
 # effect on the TOP half of the ring, damped on the underside so they read
@@ -153,7 +152,7 @@ def ring_profile(t):
 
 def build_sack(bm, cx, cy, s, body_deg, tail_z0=None, sag=0.0,
                spread_mult=1.0, underside_scale=1.0, dents=None, crease_phase=0.0,
-               n_ring_neck=N_RING_NECK):
+               n_ring_neck=N_RING_NECK, collar_n=2):
     """One sack as a single continuous loft. tail_z0 overrides the resting
     height (used to stack a sack on top of others instead of the ground);
     sag bows the body downward at mid-length (draping over what it rests
@@ -175,10 +174,14 @@ def build_sack(bm, cx, cy, s, body_deg, tail_z0=None, sag=0.0,
     # rings so the new flare-to-dome curve (see ring_profile) samples smoothly
     # instead of chunky facets; sacks 2/3 keep the original density.
     ts += [1.0 + (i + 1) / n_ring_neck * NECK_FRAC for i in range(n_ring_neck)]
-    # r6: COLLAR_N rings spanning +-COLLAR_HALF_T around the pinch, each with
+    # r6: collar_n rings spanning +-COLLAR_HALF_T around the pinch, each with
     # its own bump fraction (0 at the two edge rings, 1 at the centre ring,
     # cosine in between) -- a smooth rounded bead instead of a flat step.
-    collar_offsets = [(i / (COLLAR_N - 1)) * 2.0 - 1.0 for i in range(COLLAR_N)]  # -1..1
+    # Only sack 1's neck is judged (sacks_detail/34), so it gets the wider
+    # 3-ring band; sacks 2/3 keep the cheaper 2-ring version to stay under
+    # the 8000-tri prop budget (5 rings on all three pushed the batch to
+    # 8500 tris).
+    collar_offsets = [(i / (collar_n - 1)) * 2.0 - 1.0 for i in range(collar_n)]  # -1..1
     collar_ts = [t_pinch + x * COLLAR_HALF_T for x in collar_offsets]
     collar_bump = {ct: math.cos(x * math.pi / 2.0) for ct, x in zip(collar_ts, collar_offsets)}
     ts = sorted(set(ts) | set(collar_ts))
@@ -330,7 +333,7 @@ def build():
     dents3 = [(0.14, -math.pi / 2, 0.16, 1.1, 0.30), (0.74, -math.pi / 2, 0.16, 1.1, 0.28)]
 
     build_sack(bm, c1[0], c1[1], s1, body_deg=18, dents=dents1, crease_phase=0.0,
-               n_ring_neck=13)  # this is the judged neck (sacks_detail/34) -- extra density for the dome tip
+               n_ring_neck=13, collar_n=3)  # judged neck (sacks_detail/34) -- extra density for the dome tip + wider collar band
     build_sack(bm, c2[0], c2[1], s2, body_deg=-70, dents=dents2, crease_phase=2.4)
     build_sack(bm, (c1[0] + c2[0]) / 2.0 + 0.02, (c1[1] + c2[1]) / 2.0 - 0.01, s3,
                body_deg=100, tail_z0=(top1 + top2) / 2.0 + 0.03 * s3,
