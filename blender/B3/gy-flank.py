@@ -434,34 +434,79 @@ bpy.ops.wm.save_as_mainfile(
 C.export_glb([obj], C.MODELS_DIR + "/gy-flank.glb")
 
 # ---- render rig ----
-# round-3 evidence-pass fix: the fill light sat only ~2 m out from a 12 m
-# flat wall at 60 W -- an AREA light that close blows out into a near-white
-# frame at any oblique angle (the _34 white-out) and throws its own visible
-# highlight disc onto the wall as a "ghost hotspot" at mid-height/mid-run.
-# Moved back and turned down; the sun (already grazing at 45 deg) remains
-# the key light so bevels still catch.
-C.add_sun(elevation_deg=45, azimuth_deg=130, energy=3.0)
-C.add_fill_light(loc=(16, -20, 9), energy=14)
+# round-6 fixlist item 1, diagnosis-first: measured gy-flank_ctx.png at r5's
+# elevation=45/azimuth=130 -- the coursing band's own dark shadow LINE was
+# only 1-2 px tall (row 183-184 of 540, sum 366 vs 514 on the flat wall
+# either side -- 29% darker but genuinely sub-pixel-thin) and the two
+# plinth tiers showed a lit ledge with NO dark step-shadow beneath it at
+# all (rows 360-368 brighter, then straight to background tone at 369 --
+# no shadow band). That is cause (i): the geometry is deep enough (0.16-
+# 0.24 m proud, well past the fixlist's own thresholds) but the light
+# direction throws almost no shadow off it. Worked out why, algebraically:
+# for an overhang of depth d on a wall whose face normal is +X, the vertical
+# throw of its cast shadow onto the wall below/behind it is
+#   throw = d * tan(elevation) / |sin(azimuth)|
+# (derived from the sun's own rotation matrix, V = sun_dir(elevation,
+# azimuth)). At elevation=45/azimuth=130, throw = d*1.305 -- but sin(130)=
+# 0.766 is close to 1, meaning azimuth was ALSO close to hitting the wall
+# near its own outward normal (incidence-from-normal angle cos(theta) =
+# cos(e)*sin(a) = 0.766*0.707 = 0.542, theta only 57 deg off normal) --
+# closer to head-on than the shallow raking angle relief actually needs.
+# Fix is NOT more geometry (already tried 3 rounds) -- it is a genuinely
+# raking light: LOW sin(azimuth) (light travelling nearly PARALLEL to the
+# wall's own length, i.e. grazing along the 118 m run rather than square
+# across it) maximises both incidence obliquity AND shadow throw at once,
+# since throw = d*tan(e)/sin(a) grows as sin(a) shrinks. At elevation=32,
+# azimuth=15: incidence angle off normal = acos(cos(32)*sin(15)) = 77 deg
+# (strongly raking, the fixlist's own diagnostic target), and shadow throw
+# = d*tan(32)/sin(15) = d*2.41 -- for the 0.24 m lip that is ~0.58 m of
+# vertical shadow throw, roughly double what r5's flatter light produced,
+# and it lands on a genuinely receding surface (the wall face proper below
+# the coursing, and the stepped-back upper plinth tier above the lower
+# one) rather than folding back onto the overhang's own front face.
+# Energy raised 3.0 -> 6.0 to compensate: cos(theta)=0.22 at this angle
+# means the directly-lit wall face only receives ~22% of full sun
+# intensity, so without more energy the whole frame would read dim/muddy;
+# raising energy brightens the LIT face (and, via bounces, the true
+# shadow's ambient floor stays governed by the world background, not sun
+# energy) so contrast is gained, not lost.
+C.add_sun(elevation_deg=32, azimuth_deg=15, energy=6.0)
+# fill light energy trimmed 14 -> 4 (round-6 second pass, was 8 on the
+# first pass): measured after the first pass -- the coursing band came in
+# strong (36-39% darker, 42px tall, see manifest), but the plinth's TWO
+# tiers showed only bright lit ledges with a soft 4-8% step between them,
+# not a real dark line -- this fill, positioned high (z=9) and reasonably
+# close, was still filling in the plinth's own cast shadow specifically
+# (the plinth sits much closer to the fill light's own downward throw than
+# the coursing band does). Cut further so the sun's own raking shadow does
+# more of the plinth's contrast, while still keeping the door reveal and
+# hardware (which rely on this fill too) clear of pure-black.
+C.add_fill_light(loc=(16, -20, 9), energy=4)
 
 eye = 1.6
-# face/34 aimed AT a door or window bay, not a blank stretch of the mostly-
-# blind wall -- a flat unbroken plane filling the whole frame reads as
-# nothing in a clay test even though the geometry is correct there.
-# _face round-3: pulled back (8m -> 11m offset) and given a longer lens
-# (28 -> 40mm) so the recess head reads as a true square-on elevation
-# instead of the wide-lens perspective splay that made the lintel/coping
-# edge look diagonal.
-# round-4: pulled back further and retargeted higher (y 1.3 -> 4.0) so the
-# coursing break (y 6.0-6.14) and the sloped plinth both land in frame
-# together with the door, not just the door alone.
-# round-5 fixlist item 1a/1c: the r4 frame's vertical FOV at target y=4.0
-# only spanned roughly y=1.2..6.8 -- the coursing landed, but the ground
-# and the whole two-tier PLINTH sat below the bottom edge, unevidenced in
-# the very frame the fixlist requires it in. Retargeted lower (mid-height
-# between the ground and the coursing top) and widened the lens so both
-# ends of the wall's readable band -- plinth at the foot, coursing above
-# the door heads -- land in the SAME wide frame together with the door.
-cam_face = C.add_camera("cam_face", C.V(14.0, eye, 14), C.V(4, 3.1, 14), lens=24)
+# round-6 fixlist framing ruling: a 118.5 m wall shot whole at eye height
+# is not a view any player ever has -- a player walks past this wall a few
+# metres away. cam_face is now a REPRESENTATIVE SECTION at genuine walking
+# distance (5.5 m out, within the fixlist's 3-6 m band), 1.6 m eye height,
+# centred between the door at z=14 and the nearest window at z=20 (only
+# 6 m apart -- the tightest door/window pair on the wall). At this distance
+# a 16 mm lens's own horizontal FOV (~97 deg on a 16:9 sensor) covers
+# ~12.4 m of wall width -- both the door and the window land in frame with
+# margin, not just the door alone. Target height 3.4 m (half-range 3.4 m
+# at 5.5 m out) puts the visible vertical band from just below ground to
+# y~6.8 -- ground, plinth (both tiers) and the coursing band (5.95-6.25)
+# all land together; the window band (8.8-9.85) sits above this frame's
+# top edge and is not claimed here (it reads instead in gy-flank_ctx.png,
+# kept pulled back for massing per the fixlist's own explicit allowance).
+# round-6 second pass: the first version of this frame (target y=3.4,
+# lens 16) put the frame's own bottom edge at almost exactly y=0.0 --
+# squeezing the ENTIRE 0.5 m plinth (both tiers) into the frame's last row
+# or two, off-frame in practice (measured: rows 510-539 showed only a
+# sliver of the lower tier's lit top, no room for its shadow step at all).
+# Retargeted slightly lower and widened a touch so the frame's bottom edge
+# sits at y=-0.3 (clear margin below ground) and the top still clears the
+# coursing band (y up to 6.9) -- both tiers now have real vertical room.
+cam_face = C.add_camera("cam_face", C.V(9.5, eye, 17.0), C.V(4, 3.3, 17.0), lens=15)
 # _34 round-3 refit: pixel-checked the r3 render -- values were ~189/255,
 # NOT clipped white. The apparent "white-out" was a framing problem: the
 # target height (4.5m) sits in the middle of the LARGEST deliberately blank
@@ -484,6 +529,13 @@ cam_detail = C.add_camera("cam_detail", C.V(9.0, 1.15, 14.0), C.V(4, 1.15, 14.0)
 cam_window = C.add_camera("cam_window", C.V(7.0, 9.325, -28.0), C.V(4, 9.325, -28), lens=40)
 # round-4: pulled back and widened so both downpipe runs (z +-26), the
 # coursing break, and the plinth all land in one wide elevation shot.
+# round-6 fixlist framing ruling: kept deliberately pulled back -- this is
+# the ONE frame the ruling explicitly allows to stay wide, "for overall
+# massing" -- covering both downpipe runs and 3 windows in one elevation.
+# It is not the frame the coursing/plinth relief test is judged against;
+# that is cam_face (reframed to walking distance above). The new raking
+# sun (elevation 32/azimuth 15) still improves this frame's own coursing
+# line and downpipe contrast as a side effect, but is not relied on here.
 cam_ctx = C.add_camera("cam_ctx", C.V(34, 8, 0), C.V(0, 6, 0), lens=18)
 # round-5 fixlist item 1b: the run now spans ground (shoe) to PIPE_TOP+0.30
 # (hopper mouth), ~12 m of wall height -- pulled well back and re-centred

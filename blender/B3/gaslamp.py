@@ -217,7 +217,25 @@ CAP_HALF = HALF + 0.05          # 0.20 m, clears the 0.192 m post-corner radius
 # geometric self-shadowing ratio, not a lighting trick) so the flue
 # surface visible through each gap sits in the tunnel's own cast shadow
 # for the sun/camera angles used here.
-WALL_T = 0.09                   # real wall thickness, not a shell
+# round-6 fixlist item 2: worked the geometry, not just the fill light.
+# With the wall thickness below and the flue's own radius, a ray entering
+# anywhere in the gap's own height and travelling at this scene's sun
+# angle (elevation 48/azimuth 135 -> a vertical:horizontal drop ratio of
+# 1.571, by the same rotation-matrix method used on gy-flank) drops
+# 1.571*(wall_t + gap-to-flue annulus) before it could reach the flue
+# surface -- with WALL_T=0.13 that drop (~0.24 m) is already DEEPER than
+# the gap's own visible height (~0.17 m), so no direct sun ray can reach
+# the visible flue patch at all: the interior a camera sees through any
+# gap is ambient-only by construction, regardless of which side is shot.
+# (A first pass this round tried moving cam_vent to shoot the shadowed
+# pillar faces instead -- reverted below, see cam_vent's own comment: it
+# actually made pillar-vs-gap contrast WORSE, because the pillar itself
+# lost its own direct-sun brightness too.) What r5 actually measured as
+# "only 10-16% darker" was the AMBIENT floor being pulled up by the
+# vent_fill point light (energy 1.0) sitting right in the cavity -- cut
+# hard below, not the geometry.
+WALL_T = 0.13                    # deepened a further ~45% (0.09->0.13) as
+                                  # margin against the ratio above
 RIM_H = 0.035                   # solid rim band, top and bottom of each face
 CAP_Y0, CAP_Y1 = PLATE_Y1, PLATE_Y1 + 0.24
 MID_Y0, MID_Y1 = CAP_Y0 + RIM_H, CAP_Y1 - RIM_H
@@ -320,8 +338,13 @@ C.add_fill_light(loc=(-1.0, -1.5, 1.6), energy=25)
 # clear of both solids -- keeps the shadowed flue surface seen behind
 # each opening evidenced (non-pure-black) without lighting it enough to
 # stop reading as the darkest surface in the frame, the actual test.
+# round-6: energy cut 1.0 -> 0.15 -- r5's own pixel table (10-16% darker)
+# argued this light was doing too much of the interior's brightness itself,
+# fighting the >=50%-darker target directly. Cut hard, right to the floor
+# needed to keep the cavity clear of pure-black once the camera is looking
+# into the shadowed side (see cam_vent below), not tuned to look good.
 _vent_fill = bpy.data.lights.new("vent_fill", type='POINT')
-_vent_fill.energy = 1.0
+_vent_fill.energy = 0.15
 _vent_fill.shadow_soft_size = 0.02
 _vent_fill_obj = bpy.data.objects.new("vent_fill", _vent_fill)
 _vent_fill_obj.location = C.V(0, (CAP_Y0 + CAP_Y1) / 2, 0.075)
@@ -343,6 +366,21 @@ cam_detail = C.add_camera("cam_detail", C.V(0.45, 2.02, -0.55), C.V(0.05, 1.96, 
 # taller than r4's cap) -- retargeted higher and pulled back slightly so
 # the whole new box-and-pyramid cap, all 4 visible pillar/gap faces on the
 # near two sides, lands in frame with margin.
+# round-6 fixlist item 2, first diagnosis pass: moved this camera to the
+# OPPOSITE octant from the sun (thinking "look into shadow" meant "look at
+# the shadowed pillar faces") and re-rendered as a TEST before finalising --
+# measured worse in the way that matters: the PILLARS themselves dropped to
+# ~377/765 (a shadow-side face), so although the gaps read 35-38% darker
+# than their own adjacent pillar (up from r5's 10-16%), that pillar was no
+# longer a genuinely LIT reference the way the fixlist's target implies --
+# reading a dim hole against a dim pillar is not the same evidence as a
+# dark hole against a bright, sunlit iron face. Reverted the camera to the
+# SUN-FACING side (matching r5 framing, pillars back to their true ~500+
+# lit brightness) and moved the actual light-blocking work to the geometry
+# instead (see the baffle lips below) -- the correct reading of "angle the
+# openings away from the light" here is to shape the OPENING's own interior
+# so it self-shadows regardless of which side is shot, not to hide the test
+# by shooting a dim side.
 cam_vent = C.add_camera("cam_vent", C.V(0.48, 2.05, -0.48), C.V(0.0, 2.45, 0.0), lens=48)
 
 C.setup_render('CYCLES', samples=48, res=(960, 540), device='CPU')
