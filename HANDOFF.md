@@ -41,12 +41,32 @@ quotes, or a judge loop that will not converge.
   `2a-church-ginpalace-pass`). B1 and B3 still open — see PAUSED block below.
   The assembled game passes the 15/15 gate with current assets (48 fps median).
 
-## ⏸ PAUSED by the operator 2026-08-31 19:40 PT — resume here
+## ▶ RESUMED 2026-08-31 (session model Opus 5, subagents sonnet)
+Pipeline restarted after the pause. Fresh builders `builder-B1-r5b` and
+`builder-B3-r3u` spawned on `model: sonnet`, each briefed with
+BRIEF-COMMON.md + batch brief + its fixlist verbatim + the WIP resume state
+below. Orchestration only on Opus 5.
+
+**WIP state measured at resume (precise mtimes, 2026-08-31 PT):**
+- B1 stall: blend 19:37:06 → renders 19:37:12–40 → glb 19:37:41. CLEAN.
+- B1 sacks: blend 19:30:57 → renders 19:31:11+ → glb 19:31:39. CLEAN.
+  So B1's r5 rebuild IS delivered; only manifest (stale 19:07) + the
+  countable-property pixel verification were missing → verify-first brief.
+- B3 viaduct: blend 19:23 → renders 19:23–24 → glb 19:23. CLEAN.
+- B3 gy-flank: blend 19:22 → renders 19:22–23 → glb 19:22. CLEAN, but item 4
+  is an EVIDENCE requirement — provenance-clean ≠ requirements-met.
+- B3 gaslamp: blend 19:37:49 NEWER than _detail/_vent (19:33) → those two
+  frames STALE, must reshoot. _face/_34 (19:37:57/19:38:03) clean.
+- B3 rookery: rookery.py 19:18:02 NEWER than rookery.blend 16:09:26 — the
+  script was edited and NEVER RUN. All rookery frames stale (11:02–11:04),
+  glb 16:09 stale. This is the real remaining work in B3.
+- B3 manifest B3.md stale (10:31).
+
+### ⏸ Previous pause (2026-08-31 19:40 PT, historical)
 the operator paused the pipeline to change the session model (Fable was at 7% with
 a reset >2 days out). **Session model is now Opus 5** (set 19:45 PT via
 /model opus, saved as the default for new sessions). Both running builders
-were TaskStop'd at 19:38; their WIP is committed (117c7b3). NO agents are
-running.
+were TaskStop'd at 19:38; their WIP is committed (117c7b3).
 
 **Model rule on resume:** keep spawning builders and judges with
 `model: sonnet` explicitly — Sonnet has done every 2a round competently and
