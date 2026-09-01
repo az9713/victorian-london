@@ -53,7 +53,18 @@ NECK_MIN_R = 0.016
 SPREAD = 1.20
 ENV_FLOOR = 0.05
 COLLAR_PROUD = 0.017  # r5: raised from 0.010 -- at the new (much wider) pinch/flare contrast the old proud amount read as a faint dimple, not a distinct cord band
-COLLAR_HALF_T = 0.005
+# r6 fixlist 2c: measured the actual render -- r5's COLLAR_HALF_T=0.005 packs
+# the full 0.017 radial jump into a ~6.5 mm axial span (2 rings, same radius,
+# right next to each other). That is a thin washer standing on its edge, not
+# a rounded cord -- it renders as a sharp angular spike/fin at the pinch,
+# exactly the "faceted blade" defect the fixlist is trying to eliminate, just
+# relocated from the tip to the pinch. Fix: widen the band 6x (COLLAR_HALF_T)
+# and spread the proud amount over COLLAR_N rings with a smooth cosine bump
+# (peak at the centre ring, tapering to zero at the two edge rings) instead
+# of a flat two-ring step, so the band reads as a rounded bead/cord wrapped
+# around the pinch, not a disc.
+COLLAR_HALF_T = 0.030
+COLLAR_N = 5
 
 # (t_center, t_width, amount) -- fold constrictions along the body, full
 # effect on the TOP half of the ring, damped on the underside so they read
@@ -164,7 +175,12 @@ def build_sack(bm, cx, cy, s, body_deg, tail_z0=None, sag=0.0,
     # rings so the new flare-to-dome curve (see ring_profile) samples smoothly
     # instead of chunky facets; sacks 2/3 keep the original density.
     ts += [1.0 + (i + 1) / n_ring_neck * NECK_FRAC for i in range(n_ring_neck)]
-    collar_ts = [t_pinch - COLLAR_HALF_T, t_pinch + COLLAR_HALF_T]
+    # r6: COLLAR_N rings spanning +-COLLAR_HALF_T around the pinch, each with
+    # its own bump fraction (0 at the two edge rings, 1 at the centre ring,
+    # cosine in between) -- a smooth rounded bead instead of a flat step.
+    collar_offsets = [(i / (COLLAR_N - 1)) * 2.0 - 1.0 for i in range(COLLAR_N)]  # -1..1
+    collar_ts = [t_pinch + x * COLLAR_HALF_T for x in collar_offsets]
+    collar_bump = {ct: math.cos(x * math.pi / 2.0) for ct, x in zip(collar_ts, collar_offsets)}
     ts = sorted(set(ts) | set(collar_ts))
 
     # Pass 1: centerline position + base cross-section radii per ring.
@@ -174,7 +190,8 @@ def build_sack(bm, cx, cy, s, body_deg, tail_z0=None, sag=0.0,
         is_collar = any(abs(t - ct) < 1e-9 for ct in collar_ts)
         u, bend_w, bend_z, width_r, h_top, h_bot = ring_profile(t if not is_collar else t_pinch)
         if is_collar:
-            band_r = max(width_r, h_top) * s + COLLAR_PROUD * s
+            bump = next(f for ct, f in collar_bump.items() if abs(t - ct) < 1e-9)
+            band_r = max(width_r, h_top) * s + COLLAR_PROUD * s * bump
             width_r = h_top = h_bot = band_r / s
         if t <= 1.0:
             bend_z += -sag * math.sin(math.pi * t)

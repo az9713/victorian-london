@@ -110,8 +110,16 @@ for hy in (LAN_Y0 + 0.06, LAN_Y0 + 0.20, LAN_Y1 - 0.06):
     C.add_cylinder(bm, hinge_x, hinge_z, hy - 0.015, hy + 0.015,
                     0.016, segments=8, mat_idx=IRON)
 # latch/catch stays on the frame's original corner post, where the door
-# would meet it if closed -- shows what the open door swung away from
-latch_cx, latch_cz = (HALF - POST / 2), -(HALF - POST / 2) - 0.02
+# would meet it if closed -- shows what the open door swung away from.
+# round-3b fix: the old -0.02 offset put the latch box's near face at
+# z=-0.156, short of the post's own outer face at z=-HALF=-0.15 by only
+# 0.006 m -- not a real gap, just enough to trap a sliver of un-lit space
+# between them that no light angle reached: the pure-black crevice next to
+# the latch in gaslamp_detail.png. Flush-mounting the latch against the
+# post's outer face (touching, not overlapping -- same solid-to-solid
+# adjacency as the frame rails above) removes the trapped crevice entirely.
+latch_cx = HALF - POST / 2
+latch_cz = -HALF - 0.02  # near face flush with the post's outer face (z=-HALF)
 C.add_box(bm, latch_cx - 0.02, latch_cx + 0.025, LAN_Y0 + 0.14, LAN_Y0 + 0.19,
           latch_cz - 0.02, latch_cz + 0.02, mat_idx=IRON)
 
@@ -123,7 +131,13 @@ C.add_box(bm, latch_cx - 0.02, latch_cx + 0.025, LAN_Y0 + 0.14, LAN_Y0 + 0.19,
 # built the same trimmed-strip way as the frame rails above, so the strips
 # never overlap each other or the corner posts, and the pass-through's own
 # side faces (each strip's inner face) come for free as real reveal walls.
-HOLE = 0.05
+# round-3b fix: HOLE=0.05 left a 0.028 m clearance ring around the 0.022 m
+# pipe base, 0.02 m deep -- too wide and deep to catch any light from the
+# door-gap camera angle, so it read as the "black blob beside the burner
+# pipe" the fixlist calls out. Snugging the hole down to the pipe base's
+# own radius plus a hairline clearance keeps the reveal a real pass-through
+# without leaving an unlit gap wide enough to go black.
+HOLE = 0.026
 FLOOR_Y0, FLOOR_Y1 = LAN_Y0, LAN_Y0 + 0.02
 C.add_box(bm, -INNER, -HOLE, FLOOR_Y0, FLOOR_Y1, -INNER, INNER, mat_idx=IRON)
 C.add_box(bm, HOLE, INNER, FLOOR_Y0, FLOOR_Y1, -INNER, INNER, mat_idx=IRON)
@@ -131,8 +145,13 @@ C.add_box(bm, -HOLE, HOLE, FLOOR_Y0, FLOOR_Y1, -INNER, -HOLE, mat_idx=IRON)
 C.add_box(bm, -HOLE, HOLE, FLOOR_Y0, FLOOR_Y1, HOLE, INNER, mat_idx=IRON)
 
 # gas jet + burner, rising through the floor's pass-through, visible
-# through the glass
-C.add_cylinder(bm, 0, 0, LAN_Y0 + 0.02, LAN_Y0 + 0.14, 0.012, segments=10, mat_idx=IRON)
+# through the glass. round-3b fix: this cylinder used to start at
+# LAN_Y0+0.02 -- the floor's OWN top face -- so nothing actually occupied
+# the pass-through hole through the floor's 0.02 m thickness; the hole was
+# genuinely empty, unlit, and read as a black blob. Starting the pipe at
+# LAN_Y0 (the floor's underside) runs it through the full pass-through, as
+# a real gas feed rising from below the lantern would.
+C.add_cylinder(bm, 0, 0, LAN_Y0, LAN_Y0 + 0.14, 0.012, segments=10, mat_idx=IRON)
 C.add_cylinder(bm, 0, 0, LAN_Y0 + 0.14, LAN_Y0 + 0.18, 0.022, segments=10, mat_idx=IRON,
                radius_top=0.016)
 
@@ -144,9 +163,22 @@ C.add_cylinder(bm, 0, 0, LAN_Y0 + 0.14, LAN_Y0 + 0.18, 0.022, segments=10, mat_i
 # a slimmer recessed core shaft, with a real open step between each ring --
 # genuine geometry that catches light on the proud rings and casts shadow
 # into the recesses between them, not a smooth cone with a normal map.
-CAP_Y0, CAP_Y1 = LAN_Y1, LAN_Y1 + 0.13
-# round-3 fix: a segments=4 cylinder's verts sit on the +-x/+-z axes (facing
-# the lantern's flat glass sides), so its square is rotated 45 deg from the
+# round-3b fix: a segments=4 cylinder's RADIUS is the VERTEX distance, not
+# the flat-face (apothem) distance -- apothem = radius*cos(45). The old
+# "recessed core" used radius=HALF (0.15 m) at the same 45 deg offset as the
+# rings, so its flat faces only reached apothem=0.106 m along the cardinal
+# (glass-side) directions, well short of the lantern rim at HALF=0.15 m --
+# an uncovered gap between the core and the rim, open straight down into the
+# lantern interior with no light reaching it: the black wedge in
+# gaslamp_vent.png. A thin sealed PLATE across the whole lantern-top opening
+# (full HALF x HALF square, matching the rim exactly) closes that gap before
+# any of the recessed/proud ring geometry starts, independent of the
+# vertex-vs-apothem math above it.
+PLATE_Y0, PLATE_Y1 = LAN_Y1, LAN_Y1 + 0.02
+C.add_box(bm, -HALF, HALF, PLATE_Y0, PLATE_Y1, -HALF, HALF, mat_idx=IRON)
+CAP_Y0, CAP_Y1 = PLATE_Y1, PLATE_Y1 + 0.13
+# a segments=4 cylinder's verts sit on the +-x/+-z axes (facing the
+# lantern's flat glass sides), so its square is rotated 45 deg from the
 # lantern's own square footprint (whose CORNER posts sit on the diagonals,
 # at radius sqrt2*(HALF-POST/2) = 0.192 m). At the old CAP_HALF=0.18 with no
 # offset, the cap's flats (apothem = CAP_HALF*cos45 = 0.127 m) fell well
@@ -165,7 +197,8 @@ for k in range(N_RINGS):
                     angle_offset_deg=VENT_ROT)
 BAND_Y1 = CAP_Y0 + N_RINGS * (RING_T + GAP_T) - GAP_T
 C.add_cylinder(bm, 0, 0, CAP_Y0, BAND_Y1, HALF, segments=4, mat_idx=IRON,
-                angle_offset_deg=VENT_ROT)  # recessed core linking the rings
+                angle_offset_deg=VENT_ROT)  # recessed core linking the rings,
+                                             # now standing on the sealed plate
 C.add_cylinder(bm, 0, 0, BAND_Y1, CAP_Y1, CAP_HALF, segments=4, mat_idx=IRON,
                radius_top=0.015, angle_offset_deg=VENT_ROT)  # roof pyramid
 # finial knob

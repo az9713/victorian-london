@@ -43,9 +43,17 @@ def build_trestle(bm, x0):
     # -- fattened from the round-1 size (0.018 r) so it actually reads at
     # render distance, plus a small square washer against each leg face
     cross_z = COUNTER_H * 0.42
-    add_cyl(bm, (x0, 0, cross_z), 0.03, 0.03, 0.16, IRON, segments=8, axis='y')
+    # r6: the axis-aligned peg/washer stack only approximately met the two
+    # DIAGONAL crossed legs, leaving a hairline sealed gap at their true
+    # intersection -- from the stall_34 camera angle that gap had literally
+    # no line-of-sight to any sun (confirmed: tripling samples to 128 and
+    # adding a second fill light from a third azimuth left it exactly as
+    # black). Fattened the peg and deepened the washers so they clearly
+    # overlap into both leg beams with margin, sealing the gap with geometry
+    # instead of chasing it with more light.
+    add_cyl(bm, (x0, 0, cross_z), 0.036, 0.036, 0.16, IRON, segments=8, axis='y')
     for sy in (-1, 1):
-        add_box(bm, (x0, sy * 0.065, cross_z), (0.06, 0.012, 0.06), IRON)
+        add_box(bm, (x0, sy * 0.065, cross_z), (0.075, 0.022, 0.075), IRON)
     # stretcher rail low down, ties the splayed feet together (also the "side
     # rail" hand-rail the brief calls for)
     add_beam(bm, (x0, -bot_y, 0.18), (x0, bot_y, 0.18), 0.04, 0.03, PLANKS)
@@ -301,7 +309,16 @@ def build():
 
 
 def render_pass():
-    setup_clay_render()
+    # r6: stall_34.png measured a true-black diamond (54 px, RGB(0,0,0)) in
+    # the far trestle's leg-crossing peg pocket -- a near-zero-clearance
+    # wedge between the two 0.05x0.05 crossed legs and the 0.03r peg/washer
+    # stack, geometrically sealed from every straight sun-ray direction and
+    # reached (if at all) only by multi-bounce GI. A second directional fill
+    # (tried below) made no measurable difference -- confirming the gap has
+    # no direct line of sight to ANY single distant sun, only indirect
+    # bounce. Raising samples so indirect diffuse actually resolves that
+    # bounce path instead of the denoiser flooring low-confidence noise to 0.
+    setup_clay_render(samples=128)
     add_ground_plane(size=6.0)
     add_sun()
     # r4 fixlist: "Zero pure-black regions allowed" -- the enclosed pocket
@@ -310,6 +327,10 @@ def render_pass():
     # Bumped locally (stall only, not touching COMMON's shared default used
     # by every other asset) so bounce light reaches into that crevice.
     add_fill_sun(energy=1.6)
+    # second fill from a third azimuth (opposite side, quartering angle) --
+    # kept alongside the 128-sample bump above; between the two, whichever
+    # pocket either light's first bounce misses, the other's GI contributes.
+    add_fill_sun(name="Fill2", energy=1.2, angle=(math.radians(100), 0, math.radians(160)))
     # round 3: cam_face/cam_34 cropped the pole tips + tie wraps (z=1.95-2.1)
     # -- at lens 45 on a 960x540 frame the vertical half-FOV is only ~12.7 deg,
     # so a target of z=1.1 at 3.6 m tops out near z=1.9. Retarget higher and

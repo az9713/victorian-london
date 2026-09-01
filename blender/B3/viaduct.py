@@ -183,9 +183,15 @@ build_pier_face_with_niche(-PIER_HALF_X, flip=True)
 # as noise at render distance -- rebuilt as two concentric non-overlapping
 # radial bands at different proud depths (order 2, nearest the opening,
 # steps out further than order 1), a real stepped voussoir profile.
+# round-3b fix: the r2/r3 depths (0.08 m / 0.18 m proud on a 13.3 m-radius
+# arch) produced only a thin highlight line at any normal viewing distance --
+# technically two orders, but reading as "one flat surface" exactly as the
+# fixlist called out. Doubling both depths (and widening order 2 slightly)
+# makes the step between them, and between order 1 and the flat spandrel,
+# a real visible volume change in the face/34/detail frames, not a bevel.
 RING_ORDERS = (
-    (R + 0.35, R + 0.70, 0.08),   # order 1: outer band, shallow
-    (R, R + 0.35, 0.18),          # order 2: inner band (at the opening), deeper
+    (R + 0.40, R + 0.80, 0.16),   # order 1: outer band, shallow
+    (R, R + 0.40, 0.34),          # order 2: inner band (at the opening), deeper
 )
 RING_MAX_DEPTH = max(d for _, _, d in RING_ORDERS)
 
