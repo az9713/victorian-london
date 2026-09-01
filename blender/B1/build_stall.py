@@ -63,6 +63,46 @@ def build_top_boards(bm):
         add_box(bm, (0, y, COUNTER_H + BOARD_T / 2), (LEN, board_w, BOARD_T), PLANKS)
 
 
+def add_rope_wrap(bm, pole_x, attach_z, canvas_mat, rope_mat, pole_r=0.03):
+    """A tied lashing where the canvas end wraps the canopy pole: a gathered
+    bulge of bunched fabric (canvas pulled in tight, not left flat), a helix
+    of rope turns cinched over the gather, and a loose hanging tail knot --
+    the parts a stranger reads as 'this is tied here', not a machined collar.
+    """
+    # gathered canvas: the fabric doesn't just end at the pole, it bunches --
+    # a short tapered, slightly lobed sleeve of cloth pulled toward the pole.
+    n_lobes = 6
+    gather_h = 0.16
+    for i in range(n_lobes):
+        a = 2 * math.pi * i / n_lobes
+        lobe_r = pole_r + 0.02 + 0.012 * math.sin(a * 3.0)  # irregular, not a perfect ring
+        cx, cy = pole_x + lobe_r * math.cos(a), lobe_r * math.sin(a)
+        add_cyl(bm, (cx, cy, attach_z), 0.016, 0.010, gather_h, canvas_mat, segments=5)
+    # rope: two cinching turns wound around the gather as a helix of short
+    # straight segments (add_beam gives a real, bevel-catching cross-section
+    # instead of a smooth torus)
+    turns = 2.0
+    coil_r = pole_r + 0.045
+    n_seg = 22
+    rope_w = 0.014
+    pts = []
+    for i in range(n_seg + 1):
+        t = i / n_seg
+        a = 2 * math.pi * turns * t
+        z = attach_z + gather_h * 0.15 - (gather_h * 0.55) * t
+        pts.append((pole_x + coil_r * math.cos(a), coil_r * math.sin(a), z))
+    for i in range(n_seg):
+        add_beam(bm, pts[i], pts[i + 1], rope_w, rope_w, rope_mat)
+    # loose hanging tail, knotted off at the last wrap, drooping under gravity
+    tail0 = pts[-1]
+    tail1 = (tail0[0] - 0.03, tail0[1] + 0.05, tail0[2] - 0.14)
+    tail2 = (tail1[0] + 0.015, tail1[1] + 0.02, tail1[2] - 0.05)
+    add_beam(bm, tail0, tail1, rope_w * 0.9, rope_w * 0.9, rope_mat)
+    add_beam(bm, tail1, tail2, rope_w * 0.7, rope_w * 0.7, rope_mat)
+    # small knot bulge where the tail departs the wrap
+    add_cyl(bm, tail0, rope_w * 1.4, rope_w * 1.4, rope_w * 1.8, rope_mat, segments=6)
+
+
 def build_canopy(bm):
     """A continuous swept, sagging canvas sheet with real thickness (round 2
     rebuild -- the flat unrotated panel segments used before left visible
@@ -82,13 +122,13 @@ def build_canopy(bm):
         add_box(bm, (x, 0.10, COUNTER_H - 0.01), (0.12, 0.03, 0.16), IRON)
         for bz in (COUNTER_H - 0.06, COUNTER_H + 0.06):
             add_cyl(bm, (x, 0.10, bz), 0.018, 0.018, 0.10, IRON, segments=8, axis='y')
-        # tie wraps: THREE fatter stacked rings gripping the pole where the
-        # canvas is lashed on (round 2's rings were only 15mm proud on the
-        # pole -- invisible at render distance), plus one short diagonal
-        # lashing turn so it reads as rope, not a smooth iron collar.
-        for i, wz in enumerate((attach_z - 0.09, attach_z - 0.02, attach_z + 0.06)):
-            add_cyl(bm, (x, 0, wz), 0.065, 0.065, 0.030, IRON, segments=10)
-        add_beam(bm, (x, -0.05, attach_z - 0.10), (x, 0.05, attach_z + 0.08), 0.018, 0.018, IRON)
+        # tie wraps (round 3 fixlist re-fix): the previous three stacked
+        # cylinders read as flat washers/nuts on the pole, not lashing --
+        # confirmed by a dedicated close-up render. Replaced with an actual
+        # coiled rope: a helix of short beam segments wound twice around the
+        # pole, a bunched-canvas gather bulge where the fabric is pulled in,
+        # and a loose hanging tail so it reads unambiguously as tied rope.
+        add_rope_wrap(bm, x, attach_z, PLASTER, IRON)
 
     n_steps = 12
     dip = 0.20
@@ -158,6 +198,14 @@ def render_pass():
     add_camera("cam_detail", (peg_x + 0.55, -0.55, peg_z + 0.15),
                mathutils.Vector((peg_x, 0, peg_z)), lens=55)
     render_to(os.path.join(RENDERS_DIR, "stall_detail.png"))
+    # round 3 re-fix: dedicated close-up on the pole-head tie wrap -- at
+    # face/34 distance the lashing is only ~20px, not enough to evidence
+    # "IN FRAME" per the fixlist, so this is a 4th delivered frame.
+    pole_x = LEN / 2.0 + 0.08
+    attach_z = 2.1 - 0.10
+    add_camera("cam_tie", (pole_x + 0.45, -0.42, attach_z + 0.02),
+               mathutils.Vector((pole_x, 0, attach_z - 0.05)), lens=55)
+    render_to(os.path.join(RENDERS_DIR, "stall_tie.png"))
 
 
 if __name__ == "__main__":
@@ -171,6 +219,11 @@ if __name__ == "__main__":
         add_camera("cq2", (peg_x + 0.55, -0.55, peg_z + 0.15),
                    mathutils.Vector((peg_x, 0, peg_z)), lens=55)
         quick_check(os.path.join(RENDERS_DIR, "stall_quick_peg.png"), res=800)
+        pole_x = LEN / 2.0 + 0.08
+        attach_z = 2.1 - 0.10
+        add_camera("cq3", (pole_x + 0.45, -0.42, attach_z + 0.02),
+                   mathutils.Vector((pole_x, 0, attach_z - 0.05)), lens=55)
+        quick_check(os.path.join(RENDERS_DIR, "stall_quick_tie.png"), res=800)
     else:
         render_pass()
         export_glb([obj], os.path.join(MODELS_DIR, "stall.glb"))

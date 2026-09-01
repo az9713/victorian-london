@@ -31,7 +31,7 @@ CLOTH = 0
 MAT_NAMES = ["cloth"]
 
 N_SEG = 36
-N_RING_BODY = 18
+N_RING_BODY = 26
 N_RING_NECK = 8
 
 HALF_W = 0.19
@@ -51,8 +51,13 @@ COLLAR_HALF_T = 0.006
 
 # (t_center, t_width, amount) -- fold constrictions along the body, full
 # effect on the TOP half of the ring, damped on the underside so they read
-# as slack cloth folds, not a string of sausage links.
-FOLDS = []
+# as slack cloth folds, not a string of sausage links. Round 2's FOLDS lived
+# on overlapping icosphere lumps, where the fold and the lump-intersection
+# seam stacked into fractured-rock facets -- this build is one continuous
+# loft with no intersections, so a narrow, gentle constriction reads as a
+# fabric crease instead. Kept wide (tw>=0.08, ~2 body-ring spacings) so
+# N_RING_BODY actually samples the dip smoothly rather than aliasing it.
+FOLDS = [(0.34, 0.09, 0.11), (0.60, 0.08, 0.09)]
 
 
 def ring_profile(t):
@@ -225,26 +230,36 @@ def build():
     clear_scene()
     bm = bmesh.new()
 
-    # sack 1 (large) and sack 2 (medium) lie side by side on the ground,
-    # overlapping footprints; sack 3 (small) is genuinely STACKED across
-    # both of them -- raised tail_z0, sagging mid-body, stiffer/more spread
-    # underside (it settles onto lumpy neighbours, not flat ground).
+    # sack 1 (large) and sack 2 (medium) lie side by side on the ground, angled
+    # apart (18 deg vs -70 deg, was -55) and pulled further apart (was 0.75 m
+    # centre-to-centre) so each reads as its OWN elongated body in the face/34
+    # frames instead of fusing into one wide loaf silhouette -- round 3's
+    # first pass had them close enough and near-parallel enough (18/-55) that
+    # the two overlapped almost edge-to-edge along most of their length.
+    # Sack 3 (small) is genuinely STACKED across both -- raised tail_z0,
+    # sagging mid-body, stiffer/more spread underside (it settles onto lumpy
+    # neighbours, not flat ground).
     s1, s2, s3 = 1.00, 0.82, 0.60
-    c1 = (-0.32, -0.13)
-    c2 = (0.35, 0.17)
+    c1 = (-0.42, -0.20)
+    c2 = (0.45, 0.24)
     top1 = HALF_H_BOT * s1 + HALF_H_TOP * s1
     top2 = HALF_H_BOT * s2 + HALF_H_TOP * s2
 
-    # dents on the two lower sacks where sack 3's weight presses in --
-    # angle pi/2 is the top of the ring (sa=+1), where sack 3 actually rests.
-    dents1 = [(0.55, math.pi / 2, 0.16, 1.1, 0.30)]
-    dents2 = [(0.45, math.pi / 2, 0.16, 1.1, 0.28)]
+    # dents: where sack 3's weight presses down into sacks 1/2 (angle pi/2 =
+    # top of the ring, sa=+1, where sack 3 actually rests), PLUS a mutual
+    # contact crease where sacks 1 and 2 themselves lean against each other
+    # near their shoulders (t~0.78, the two bodies' closest approach) --
+    # round 3's first pass only dented for the top sack's weight, so the two
+    # ground sacks had no crease where THEY touch, which is exactly the
+    # "crease/fold geometry at every contact" the fixlist asks for.
+    dents1 = [(0.55, math.pi / 2, 0.16, 1.1, 0.34), (0.72, 0.0, 0.14, 0.9, 0.16)]
+    dents2 = [(0.45, math.pi / 2, 0.16, 1.1, 0.32), (0.30, math.pi, 0.14, 0.9, 0.16)]
 
     build_sack(bm, c1[0], c1[1], s1, body_deg=18, dents=dents1)
-    build_sack(bm, c2[0], c2[1], s2, body_deg=-55, dents=dents2)
+    build_sack(bm, c2[0], c2[1], s2, body_deg=-70, dents=dents2)
     build_sack(bm, (c1[0] + c2[0]) / 2.0 + 0.02, (c1[1] + c2[1]) / 2.0 - 0.01, s3,
-               body_deg=100, tail_z0=(top1 + top2) / 2.0 - 0.01 * s3,
-               sag=0.06, spread_mult=1.15, underside_scale=0.6)
+               body_deg=100, tail_z0=(top1 + top2) / 2.0 + 0.03 * s3,
+               sag=0.09, spread_mult=1.15, underside_scale=0.55)
 
     obj = new_mesh_object("sacks", bm, material_names=MAT_NAMES)
     # no bevel: cloth has no hard edges, and the folds/collar/dents are
