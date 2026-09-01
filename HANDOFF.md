@@ -67,6 +67,19 @@ quotes, or a judge loop that will not converge.
   Fable builders (-r3f) were spawned, then stopped minutes later for the
   budget rule. FRESH SONNET builders `builder-B1-r3s` and `builder-B3-r3s`
   now run the fixlist files.
+- **19:15 PT update:** B1 trajectory: r3 judged FAIL min 3 (market 3 —
+  gable was one bare arc, not a rib fan; stall 3 — tie still reads as
+  hardware, 3rd round on that feature; sacks 3, up from 2 — contact
+  creases/squash missing). Fixlist blender/fixlists/B1-r4.md. builder-B1-r4
+  delivered (commit 8c272e7: gable rib fan, one-curve-strand rope tie,
+  sacks contact geometry); judge-B1-r4 (sonnet, fresh) is scoring now.
+  B3: builder-B3-r3s died SILENTLY ~16:25 (gone from agent list, no
+  notification) leaving viaduct untouched, rookery 4 stale frames
+  (provenance broken vs 16:09 blend), gy-flank/rookery GLBs older than
+  their blends, manifest stale. Replacement `builder-B3-r3t` (sonnet)
+  spawned 19:12 with exact disk state; it re-verifies gaslamp louvres +
+  gy-flank exposure in pixels. Lesson: builders can die WITHOUT a failure
+  notification — if a builder is >1h file-silent, check ListAgents.
 - **16:50 PT update:** B1-r3s DIED (connection lost) mid-gable-hunt; it left
   market_interior.png + market_gable.png (16:05), a market.glb re-export,
   uncommitted market.blend edits, and NO sacks/stall/barrel progress beyond
