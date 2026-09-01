@@ -243,20 +243,6 @@ def add_rope_wrap(bm, pole_x, attach_z, canvas_mat, rope_mat, pole_r=0.03, seed=
             f.smooth = True
 
 
-def add_tie_loop(bm, x, z_top, z_bot, mat_index, thick=0.010):
-    """A small drooping tie-down cord from the ridge rope (z_top) down to
-    the canvas ridge (z_bot), used for the canopy's 3 interior tie points
-    (fixlist 2a). r6 2nd pass: the first version was a small CLOSED loop
-    (rope_from_curve, bevel_res=2, 8-point profile) -- geometrically correct
-    but 128 tris each (384 for 3), which blew the already razor-thin 8,000
-    prop budget. A simple two-segment drooping cord (add_beam, a plain
-    rectangular rod) is a fraction of the cost and reads just as clearly as
-    "a cord tying the canvas to the ridge" at the size these render at."""
-    mid = (x + 0.012, 0.018, (z_top + z_bot) / 2.0 - 0.006)  # slight sideways+downward droop
-    add_beam(bm, (x, 0.0, z_top), mid, thick, thick, mat_index)
-    add_beam(bm, mid, (x, 0.0, z_bot), thick, thick, mat_index)
-
-
 def build_canopy(bm):
     """A continuous swept, sagging canvas sheet with real thickness (round 2
     rebuild -- the flat unrotated panel segments used before left visible
@@ -264,16 +250,20 @@ def build_canopy(bm):
     flagged; a single swept surface has neither problem).
 
     r6 fixlist 2a REBUILD: the single-span sine sag read as "a rigid moulded
-    panel", not cloth -- one smooth dip end to end has no support logic
-    (a canopy hangs FROM tie points, it doesn't just curve). This version
-    adds a ridge support rope strung between the two pole tops, 3 more tie
-    points along it (5 total including the 2 poles), and the canvas now
-    sags in 4 separate catenary-like cells between those 5 support points
-    -- each cell returns to baseline at its own support, so 4 distinct dips
-    are visible instead of one continuous curve. The two long free edges
-    (the canopy's front/back, not the pole ends) get a rolled hem tube with
-    real thickness, following the same per-cell sag as the sheet it hems.
-    """
+    panel", not cloth -- one smooth dip end to end. This version sags the
+    canvas in 4 separate catenary-like cells between 5 support points (the
+    2 poles + 3 interior ridge tie points) -- each cell returns to baseline
+    at its own support, so 4 distinct dips are visible instead of one
+    continuous curve. The two long free edges get a rolled hem bead with
+    real thickness, and the 3 interior tie points get a proud grommet
+    button, both integrated directly into the sheet's own vertex grid
+    (r6 2nd pass: separate rope-curve objects for these, even at a cheap
+    point count, cost 200-400 tris each once this object's mesh-wide Bevel
+    modifier -- angle_limit=80 deg, see build() -- added its own chamfers on
+    top; a 132-tri headroom on an 8,000 budget cannot absorb that. Folding
+    the hem/grommet geometry into the sheet's existing faces instead of
+    spawning new curve objects keeps the added cost to the sheet's own
+    per-vertex rate, not a separate part's fixed overhead)."""
     pole_h = 2.1
     pole_x = LEN / 2.0 + 0.08
     attach_z = pole_h - 0.10   # canvas end wraps the pole BELOW its tip
@@ -299,16 +289,6 @@ def build_canopy(bm):
         add_rope_wrap(bm, x, attach_z, PLASTER, IRON, seed=1 if sx < 0 else 2,
                        cam_azimuth=az)
 
-    # r6: ridge support rope between the two pole tops -- gives the 3
-    # interior sag cells something to physically hang from, instead of the
-    # fabric rising to full baseline height mid-span with no support (which
-    # reads as floating cloth, not a tensioned canopy).
-    ridge_z = attach_z + 0.05
-    ridge_pts = [(-pole_x, 0, ridge_z), (-pole_x * 0.5, 0, ridge_z - 0.012),
-                 (0, 0, ridge_z - 0.018), (pole_x * 0.5, 0, ridge_z - 0.012),
-                 (pole_x, 0, ridge_z)]
-    rope_from_curve(bm, ridge_pts, [1.0] * 5, 0.012, IRON, bevel_res=2)
-
     N_SUPPORTS = 5   # 2 poles + 3 interior tie points -- 4 sag cells between them
     support_x = [-pole_x + (2 * pole_x) * i / (N_SUPPORTS - 1) for i in range(N_SUPPORTS)]
 
@@ -318,66 +298,67 @@ def build_canopy(bm):
         s_local = cellf - cell
         return dip * math.sin(math.pi * s_local)
 
-    # r6 passes: 28/18/16 steps all left too little of the already razor-thin
-    # 8,000-tri budget for the ridge rope + hems + tie cords once the global
-    # Bevel modifier's cost (see the hem/tie-loop comments below) is
-    # counted. 14 steps (3.5 segments per sag cell) is the floor that still
-    # avoids a visible triangle-wave on the gentle 0.10 m dip.
-    n_steps = 14
-    dip = 0.10
+    # n_steps includes the 3 interior support x's as exact grid rows (so the
+    # sag genuinely returns to zero exactly AT each support, and the
+    # grommet buttons below land exactly on the ridge) -- 4 sheet segments
+    # per cell, 16 total, back to the original passing budget's resolution.
+    n_steps = 16
+    grid_t = sorted(set([i / n_steps for i in range(n_steps + 1)] +
+                         [i / (N_SUPPORTS - 1) for i in range(N_SUPPORTS)]))
+    dip = 0.09
     thickness = 0.018
     y_half = 0.55
-    top_v, bot_v = [], []
-    for i in range(n_steps + 1):
-        t = i / n_steps
+    bead_r = 0.010   # r6 fixlist 2a: hem bead proud-ness past y_half -- thicker than the 0.018 sheet
+    top_v, bot_v, bead_v = [], [], []
+    for t in grid_t:
         x = -pole_x + (2 * pole_x) * t
         sag = cell_sag(t, dip)
         zt = attach_z - sag
         zb = zt - thickness
+        zmid = (zt + zb) / 2.0
         top_v.append((bm.verts.new((x, -y_half, zt)), bm.verts.new((x, y_half, zt))))
         bot_v.append((bm.verts.new((x, -y_half, zb)), bm.verts.new((x, y_half, zb))))
-    for i in range(n_steps):
+        # r6 fixlist 2a: a rolled hem bead -- one extra vertex per edge per
+        # row, bulged past y_half at mid-thickness height, folding the flat
+        # side quad into a rounded double-tri bead instead of a knife edge.
+        # Built INTO the sheet's own face loop (no separate object), so it
+        # costs only ~1 extra tri per row per edge instead of a separate
+        # rope curve's fixed per-part overhead.
+        bead_v.append((bm.verts.new((x, -y_half - bead_r, zmid)),
+                        bm.verts.new((x, y_half + bead_r, zmid))))
+    n = len(grid_t)
+    for i in range(n - 1):
         tl0, tr0 = top_v[i]; tl1, tr1 = top_v[i + 1]
         bl0, br0 = bot_v[i]; bl1, br1 = bot_v[i + 1]
+        bml0, bmr0 = bead_v[i]; bml1, bmr1 = bead_v[i + 1]
         bm.faces.new((tl0, tr0, tr1, tl1)).material_index = PLASTER   # top
         bm.faces.new((bl1, br1, br0, bl0)).material_index = PLASTER  # bottom
-        bm.faces.new((tl0, tl1, bl1, bl0)).material_index = PLASTER  # -y edge
-        bm.faces.new((br0, br1, tr1, tr0)).material_index = PLASTER  # +y edge
-    # end caps at the two poles, closing the thickness
-    bm.faces.new((top_v[0][0], top_v[0][1], bot_v[0][1], bot_v[0][0])).material_index = PLASTER
-    bm.faces.new((bot_v[-1][0], bot_v[-1][1], top_v[-1][1], top_v[-1][0])).material_index = PLASTER
+        # -y hem bead: top->bead->bottom (was a single flat edge quad)
+        bm.faces.new((tl0, bml0, bml1, tl1)).material_index = PLASTER
+        bm.faces.new((bml0, bl0, bl1, bml1)).material_index = PLASTER
+        # +y hem bead
+        bm.faces.new((br0, bmr0, bmr1, br1)).material_index = PLASTER
+        bm.faces.new((bmr0, tr0, tr1, bmr1)).material_index = PLASTER
+    # end caps at the two poles, closing the (now hexagonal, hem-beaded)
+    # cross-section as a single n-gon each -- traversal order follows the
+    # true perimeter: top(-y) -> bead(-y) -> bottom(-y) -> bottom(+y) ->
+    # bead(+y) -> top(+y) -> back to start. Reversed at the +x end for the
+    # opposite outward-facing winding.
+    bml0, bmr0 = bead_v[0]
+    bm.faces.new((top_v[0][0], bml0, bot_v[0][0], bot_v[0][1], bmr0, top_v[0][1])).material_index = PLASTER
+    bml1, bmr1 = bead_v[-1]
+    bm.faces.new((top_v[-1][0], top_v[-1][1], bmr1, bot_v[-1][1], bot_v[-1][0], bml1)).material_index = PLASTER
 
-    # r6 fixlist 2a: rolled hem tube along both long free edges (-y_half and
-    # +y_half), following the same per-cell sag -- a hem is thicker than
-    # the sheet it borders so the free edge reads as a doubled/rolled
-    # border, not a knife edge.
-    # r6 2nd/3rd pass, root cause found on the 3rd: this object carries a
-    # mesh-wide Bevel modifier (angle_limit=80 deg, see build()) that ADDS a
-    # chamfer to every edge steeper than that threshold. A coarse box-
-    # section beam chain (3rd pass) has ~90 deg corners at every facet AND
-    # at every segment join, so the global bevel modifier MULTIPLIED its
-    # cost instead of saving any -- tri count went UP when the base geometry
-    # got coarser. A properly ROUND rope tube (bevel_res=2, ~12-sided
-    # profile, ~30 deg facet dihedral) stays under the 80 deg threshold, so
-    # the global bevel modifier adds nothing extra to it -- exactly like the
-    # existing (already-budgeted) rope-wrap ties. Round, not coarse, is what
-    # is actually cheap here; fewer POINTS along the sag path (not a
-    # coarser cross-section) is the real budget lever.
-    HEM_SEGS = 6
-    for sy in (-1, 1):
-        hem_pts = []
-        for i in range(HEM_SEGS + 1):
-            t = i / HEM_SEGS
-            x = -pole_x + (2 * pole_x) * t
-            sag = cell_sag(t, dip)
-            hem_pts.append((x, sy * y_half, attach_z - sag - thickness * 0.5))
-        rope_from_curve(bm, hem_pts, [1.0] * len(hem_pts), 0.024, PLASTER, bevel_res=2)
-
-    # r6 fixlist 2a: 3 ridge tie points/grommets, one per interior support
-    # (poles already carry the big rope-wrap ties) -- a small closed cord
-    # loop from the ridge rope down to the canvas top surface at each.
+    # r6 fixlist 2a: 3 ridge tie points/grommets, one per interior support --
+    # a small proud button on the canvas top surface (poles already carry
+    # the big rope-wrap ties, so these only need to read as "eyelet", which
+    # the fixlist accepts as an alternative to "cord"). A tiny box sitting
+    # on the existing top surface is a fixed, small cost regardless of the
+    # global Bevel modifier (its own edges are already at a hard ~90 deg,
+    # same order as every other bolt/nub already in the budget).
     for x in support_x[1:-1]:
-        add_tie_loop(bm, x, ridge_z - 0.004, attach_z - 0.002, IRON)
+        zt = attach_z  # sag is 0 exactly at a support
+        add_cyl(bm, (x, 0, zt + 0.006), 0.020, 0.020, 0.012, IRON, segments=8)
 
 
 def build():
