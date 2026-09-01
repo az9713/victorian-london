@@ -35,71 +35,56 @@ quotes, or a judge loop that will not converge.
   the route tour; procedural footsteps; gate = 14 checks incl. mission drive.
 - **NPCs rigged**: `meshy/flowergirl/`, `meshy/constable/` (idle+walk GLBs).
   Wander behaviour still to write (stage 5 polish).
-- **2a RUNNING** (04:30 2026-08-31): builders B1r/B2r/B3r respawned after the
-  session-limit reset (first spawn died instantly at the limit). B4 (terraces,
-  `blender/briefs/B4-terraces.md`) launches when a slot frees (≤3 concurrent).
-  Judge infra ready: judge prompt = asset-judge-loop references/judge-prompt.md
-  (slots: renders, manifest, inventory, refpack tiers, pass threshold 4);
-  parent-made inventory via `node scripts/glb_inventory.mjs`.
 - **NPCs + mission live** (tag `stage5-mission-skeleton`, commit 2199e80): gate
   is 15 checks, all passing, incl. mission round + NPC motion (measured).
-- **2a judge loops (as of 2026-08-31 11:20 PT):** B4 PASSED (tag
-  `2a-terraces-pass`), B2 PASSED (tag `2a-church-ginpalace-pass`).
-  B1 and B3 are mid ROUND 3; their full fix lists are ON DISK at
-  `blender/fixlists/B1-r3.md` and `blender/fixlists/B3-r3.md` (give to a
-  builder verbatim; each file also names exactly where the last builder
-  stopped). Trajectories: B1 min 1→2 (sacks is the blocker, 3rd round — hand
-  to a FRESH builder if it fails again); B3 min 2→3 (coincident-face black-
-  cavity bug class; zero pure black allowed). Judges are always FRESH per
-  round: prompt = asset-judge-loop references/judge-prompt.md with renders +
-  manifest + `node scripts/glb_inventory.mjs` output + refpack tier rules +
-  threshold 4. The assembled game passes the 15/15 gate with current assets
-  (48 fps median). Builder session limits reset 2:10pm PT 2026-08-31; if the
-  r-builders are dead, spawn NEW builder agents pointed at the fixlist files
-  (BRIEF-COMMON.md + their batch brief + fixlist is a complete work order).
-- **BUDGET RULE (the operator, 2026-08-31 ~15:15 PT): 7% Fable left, reset in >2
-  days.** Spawn ALL subagents (builders AND judges) with `model: sonnet`
-  until the reset. Parent (Fable) does orchestration only; keep turns lean.
-  If Sonnet also runs low, switch judges to the off-quota cross-model
-  wrappers `codex-sub`/`grok-sub` (verified on this machine, see above).
-- **Resume 15:0x PT 2026-08-31 (post-/clear):** B1r/B3r were limit-killed
-  mid-r3 and are hard-stopped via TaskStop (do not message them). Fresh
-  Fable builders (-r3f) were spawned, then stopped minutes later for the
-  budget rule. FRESH SONNET builders `builder-B1-r3s` and `builder-B3-r3s`
-  now run the fixlist files.
-- **19:15 PT update:** B1 trajectory: r3 judged FAIL min 3 (market 3 —
-  gable was one bare arc, not a rib fan; stall 3 — tie still reads as
-  hardware, 3rd round on that feature; sacks 3, up from 2 — contact
-  creases/squash missing). Fixlist blender/fixlists/B1-r4.md. builder-B1-r4
-  delivered (commit 8c272e7: gable rib fan, one-curve-strand rope tie,
-  sacks contact geometry); judge-B1-r4 (sonnet, fresh) is scoring now.
-  B3: builder-B3-r3s died SILENTLY ~16:25 (gone from agent list, no
-  notification) leaving viaduct untouched, rookery 4 stale frames
-  (provenance broken vs 16:09 blend), gy-flank/rookery GLBs older than
-  their blends, manifest stale. Replacement `builder-B3-r3t` (sonnet)
-  spawned 19:12 with exact disk state; it re-verifies gaslamp louvres +
-  gy-flank exposure in pixels. Lesson: builders can die WITHOUT a failure
-  notification — if a builder is >1h file-silent, check ListAgents.
-- **16:50 PT update:** B1-r3s DIED (connection lost) mid-gable-hunt; it left
-  market_interior.png + market_gable.png (16:05), a market.glb re-export,
-  uncommitted market.blend edits, and NO sacks/stall/barrel progress beyond
-  what -r3f left. Replacement `builder-B1-r3t` (sonnet) now runs with exact
-  disk state + the gable decision ladder: (a) use existing interior/gable
-  frame if it evidences the screen, (b) one interior backlit camera try,
-  (c) scoped geometry exception — mullion depth and/or truss moved off the
-  gable plane, nothing else on market. B3-r3s confirmed sole B3 owner at
-  ~15:57 (the 15:45-15:51 mtimes were stopped -r3f work, no race) and is
-  building: inherited gaslamp+gy-flank done-ish (but gy-flank_34 white-out
-  and missing vent-louvre shot are on its list), rookery partial, viaduct
-  untouched, manifest stale.
-  Known partial r3 work in the tree: commit 6ccdf44 exported sacks/stall/
-  barrel/rookery GLBs at 14:48, but renders (~11:05) + manifests are stale
-  and sacks has NO current renders. Builders were told to finish, re-export,
-  re-render with clean provenance, update manifests. On each "done": parent
-  runs `node scripts/glb_inventory.mjs`, mtime-checks renders vs sources,
-  spawns FRESH judges judge-B1-r3 / judge-B3-r3 (threshold 4, min-score).
-  Sacks conditional: if the cloth read fails r3, round 4 goes to a different
-  fresh builder. Both pass → gate → commit → tag `2a-complete` → stage 3.
+- **2a batches:** B4 PASSED (tag `2a-terraces-pass`), B2 PASSED (tag
+  `2a-church-ginpalace-pass`). B1 and B3 still open — see PAUSED block below.
+  The assembled game passes the 15/15 gate with current assets (48 fps median).
+
+## ⏸ PAUSED by the operator 2026-08-31 19:40 PT — resume here
+the operator paused the pipeline to switch the SESSION model to Sonnet (7% Fable
+left until a reset >2 days out). Both running builders were TaskStop'd at
+19:38; their WIP is committed (117c7b3). NO agents are running. On resume,
+spawn subagents plain (no model override needed once the session is Sonnet).
+
+**Loop mechanics (unchanged):** builder gets BRIEF-COMMON.md + batch brief +
+fixlist verbatim; on "done" the parent runs `node scripts/glb_inventory.mjs`,
+mtime-checks every render against its .blend (renders must postdate), commits
+pre-judge, then spawns a FRESH judge with asset-judge-loop
+references/judge-prompt.md + renders + manifest + inventory + refpack tiers,
+threshold 4, batch = min score. Fresh judge and fresh builder every round.
+Lessons that cost rounds: (1) builders die SILENTLY — file-silent >1h means
+check ListAgents; (2) builders see intent, not pixels — fixlists must use
+COUNTABLE properties (see B1-r5.md); (3) never message a dead/stopped
+builder, spawn fresh from the fixlist.
+
+**B1 (market/stall/barrel/crate/sacks):** r4 judged FAIL min 2 — but market
+is now 5 (gable rib fan works), barrel 4, crate 4. ONLY two features remain:
+stall tie (4 rounds: washers→clips→uniform rings) and sack-1 neck
+(rod→beak). Fixlist `blender/fixlists/B1-r5.md` (countable properties).
+Builder-B1-r5 was stopped MID-ROUND at 19:38: it had rebuilt stall tie
+(stall.blend 19:37, glb exported, `_verify_tie_zoom.png` check frame) and
+sacks (19:30) but NOT delivered/re-rendered final frames or manifest.
+Resume: fresh builder, B1-r5.md verbatim, inherit the WIP blends, verify
+each countable property in pixels, deliver. Then fresh judge (r5).
+ESCALATION RULE: if r5 fails on the same two features, that is the "loop
+will not converge" stop — bring the operator options (stronger model on these two
+small features / operator eyeball / accept at 3) instead of a blind r6.
+
+**B3 (rookery/viaduct/gy-flank/gaslamp/pillarbox):** r2 scores: pillarbox 4;
+rookery/viaduct/gy-flank/gaslamp 3. Fixlist `blender/fixlists/B3-r3.md`.
+Builder-B3-r3t was stopped MID-ROUND at 19:38 with real progress: viaduct
+rebuilt (blend+glb 19:23), gy-flank rebuilt (19:22), gaslamp rebuilt with
+NEW `gaslamp_vent.png` louvre frame (19:37); rookery blend last touched
+16:09 with 4 stale frames (boarded/detail/ctx/yard predate the blend —
+provenance broken) and rookery.glb possibly stale vs blend. Manifest B3.md
+still stale (10:31). Resume: fresh builder, B3-r3.md verbatim + this state,
+finish rookery + re-render all touched assets provenance-clean + rewrite
+manifest, deliver. Then fresh judge (r3).
+
+**After both batches pass:** re-run gate (`python -m http.server 8123 -d
+sandbox`; `node sandbox/verify/gate.mjs`), commit, tag `2a-complete`, then
+stage 3 per Next task below.
 
 ## What this project is
 A playable third-person 3D world: **1880s Victorian London, Whitechapel/Spitalfields**,
@@ -129,9 +114,9 @@ then the specialist skill the current stage names.
   wrappers (remakebench plugin). Grok sandbox is a no-op on Windows — give grok
   a scratch `-C` dir. Details in auto-memory `grok-cli-headless-fix`.
 
-## Next task (updated 2026-08-31 — supersedes the stage-1 text below)
-- **Finish the two open judge loops** (B1, B3) per the fixlist files above,
-  then re-run the gate (`node sandbox/verify/gate.mjs`, server:
+## Next task (updated 2026-08-31 19:40 PT — supersedes the stage-1 text below)
+- **Resume from the ⏸ PAUSED block above** — finish the two open judge loops
+  (B1 r5, B3 r3), then re-run the gate (`node sandbox/verify/gate.mjs`, server:
   `python -m http.server 8123 -d sandbox`) and commit+tag `2a-complete`.
 - **Then stage 3 assembly judge + lookdev:** known items — brick texel scale
   reads oversized/monotone in-game (assets.js binds PBR by material name; tune
