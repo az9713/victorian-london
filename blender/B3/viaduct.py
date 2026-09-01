@@ -270,6 +270,11 @@ C.smart_uv(obj)
 bpy.context.view_layer.objects.active = obj
 obj.select_set(True)
 
+# save BEFORE export/render, so the blend's mtime is provably the earliest
+# of the three (provenance requirement: blend <= glb < renders)
+bpy.ops.wm.save_as_mainfile(
+    filepath="C:/Users/USERNAME/Downloads/projects/victorian-london/blender/B3/viaduct.blend")
+
 C.export_glb([obj], C.MODELS_DIR + "/viaduct-module.glb")
 
 # ---- render rig: single module (face/34/detail) + a duplicated pair at
@@ -311,6 +316,4 @@ bpy.context.scene.camera = cam_ctx
 C.render_to(C.RENDER_DIR + "/viaduct-module_ctx.png")
 C.restore_materials([obj, obj2], backup2)
 
-bpy.ops.wm.save_as_mainfile(
-    filepath="C:/Users/USERNAME/Downloads/projects/victorian-london/blender/B3/viaduct.blend")
 print("DONE viaduct-module build+export")

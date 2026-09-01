@@ -126,12 +126,26 @@ def add_window_bars(z0, z1, y0, y1):
     n_bars = 4
     x_bar = FACE_X - 0.05
     r = 0.013
+    # round-3 fix: the proud sill block (see build_recess has_sill) sticks
+    # out to FACE_X+0.08, closer to the camera than the recessed bar at
+    # x_bar=FACE_X-0.05, and its own y-range (y0-0.08..y0+0.04) fully
+    # overlapped the old bottom cap (y0..y0+0.025) -- the cap sat entirely
+    # BEHIND the sill's proud lip, invisible from any exterior camera angle,
+    # not merely a bad framing choice. Lifting the bottom socket to seat on
+    # TOP of the sill (y0+0.045, just clear of the sill's y0+0.04 top face)
+    # is also the more correct read: bars socket INTO the sill's top
+    # surface, not into a void hidden beneath it.
+    y_bot = y0 + 0.045
     for i in range(1, n_bars + 1):
         z = z0 + (z1 - z0) * i / (n_bars + 1)
         # bar and caps are adjacent (touching), never overlapping in y
-        C.add_box(bm, x_bar - r, x_bar + r, y0 + 0.02, y1 - 0.02, z - r, z + r, mat_idx=IRON)
-        C.add_cylinder(bm, x_bar, z, y0, y0 + 0.02, r * 1.6, segments=8, mat_idx=IRON)  # bottom socket cap
-        C.add_cylinder(bm, x_bar, z, y1 - 0.02, y1, r * 1.6, segments=8, mat_idx=IRON)  # top socket cap
+        C.add_box(bm, x_bar - r, x_bar + r, y_bot + 0.02, y1 - 0.02, z - r, z + r, mat_idx=IRON)
+        # round-3 evidence fix: r*1.6 caps were only 8mm wider than the bar
+        # shaft -- too subtle to read as a distinct socket at render distance.
+        # r*2.6 makes the cap a clearly bulging collar, legible as "the bar
+        # is let into a drilled socket" rather than just a rounded bar end.
+        C.add_cylinder(bm, x_bar, z, y_bot, y_bot + 0.025, r * 2.6, segments=8, mat_idx=IRON)  # bottom socket cap
+        C.add_cylinder(bm, x_bar, z, y1 - 0.025, y1, r * 2.6, segments=8, mat_idx=IRON)  # top socket cap
 
 
 # band 1: ground band with door recesses (y 0..DOOR_Y1)
@@ -167,19 +181,48 @@ C.smart_uv(obj)
 bpy.context.view_layer.objects.active = obj
 obj.select_set(True)
 
+# save BEFORE export/render, so the blend's mtime is provably the earliest
+# of the three (provenance requirement: blend <= glb < renders)
+bpy.ops.wm.save_as_mainfile(
+    filepath="C:/Users/USERNAME/Downloads/projects/victorian-london/blender/B3/gy-flank.blend")
+
 C.export_glb([obj], C.MODELS_DIR + "/gy-flank.glb")
 
 # ---- render rig ----
+# round-3 evidence-pass fix: the fill light sat only ~2 m out from a 12 m
+# flat wall at 60 W -- an AREA light that close blows out into a near-white
+# frame at any oblique angle (the _34 white-out) and throws its own visible
+# highlight disc onto the wall as a "ghost hotspot" at mid-height/mid-run.
+# Moved back and turned down; the sun (already grazing at 45 deg) remains
+# the key light so bevels still catch.
 C.add_sun(elevation_deg=45, azimuth_deg=130, energy=3.0)
-C.add_fill_light(loc=(6, -8, 6), energy=60)
+C.add_fill_light(loc=(16, -20, 9), energy=14)
 
 eye = 1.6
 # face/34 aimed AT a door or window bay, not a blank stretch of the mostly-
 # blind wall -- a flat unbroken plane filling the whole frame reads as
 # nothing in a clay test even though the geometry is correct there.
-cam_face = C.add_camera("cam_face", C.V(8.0, eye, 14), C.V(4, 1.1, 14), lens=28)
-cam_34 = C.add_camera("cam_34", C.V(7.5, eye, 22), C.V(4, 4.0, 10), lens=24)
-cam_detail = C.add_camera("cam_detail", C.V(6.0, 9.0, -28.5), C.V(4, 9.3, -28), lens=45)
+# _face round-3: pulled back (8m -> 11m offset) and given a longer lens
+# (28 -> 40mm) so the recess head reads as a true square-on elevation
+# instead of the wide-lens perspective splay that made the lintel/coping
+# edge look diagonal.
+cam_face = C.add_camera("cam_face", C.V(11.0, eye, 14), C.V(4, 1.3, 14), lens=40)
+# _34 round-3 refit: pixel-checked the r3 render -- values were ~189/255,
+# NOT clipped white. The apparent "white-out" was a framing problem: the
+# target height (4.5m) sits in the middle of the LARGEST deliberately blank
+# band (door heads at 2.15m to window sills at 8.8m), so ~80% of the frame
+# was flat brick with nothing else in it -- reads as blown-out to the eye
+# even at a correct exposure. Retargeted to the full wall height, angled
+# along the run so a door AND a window both land in frame together with
+# the plinth and coping, which is what actually reads as "mostly blind
+# wall with occasional openings" rather than "empty plane".
+cam_34 = C.add_camera("cam_34", C.V(12.0, eye, 30.0), C.V(4, 5.2, 16.0), lens=22)
+# _detail round-3: re-centred on the window's true vertical mid-point
+# (8.8..9.85) and pulled back just enough (2.5 -> 3.4 m) at a slightly
+# longer lens for the extra frame height, so both the top AND bottom
+# socket caps land inside the shot together with the bar shafts -- r2's
+# closer crop showed only the bar mid-run, cutting the sockets off.
+cam_detail = C.add_camera("cam_detail", C.V(7.0, 9.325, -28.0), C.V(4, 9.325, -28), lens=40)
 cam_ctx = C.add_camera("cam_ctx", C.V(26, 8, 0), C.V(0, 6, 0), lens=20)
 
 C.setup_render('CYCLES', samples=32, res=(960, 540), device='CPU')
@@ -190,6 +233,4 @@ for cam, name in ((cam_face, "face"), (cam_34, "34"), (cam_detail, "detail"), (c
     C.render_to(C.RENDER_DIR + f"/gy-flank_{name}.png")
 C.restore_materials([obj], backup)
 
-bpy.ops.wm.save_as_mainfile(
-    filepath="C:/Users/USERNAME/Downloads/projects/victorian-london/blender/B3/gy-flank.blend")
 print("DONE gy-flank")

@@ -63,16 +63,23 @@ for sx, sz in corners:
     cz = sz * (HALF - POST / 2)
     C.add_box(bm, cx - POST / 2, cx + POST / 2, LAN_Y0, LAN_Y1,
               cz - POST / 2, cz + POST / 2, mat_idx=IRON)
-# top and bottom perimeter frame rails -- picture-frame construction (two
-# full-length sides, two trimmed to fit between them) instead of 4 strips
-# each running the full length: those overlapped at every corner, an
-# embedded-box coincidence that sealed a tiny light-trap and rendered as
-# the pure-black corner dots visible in round-1 renders.
+# top and bottom perimeter frame rails -- round-3 rebuild: the round-1/2
+# "picture-frame" trim (two full-length sides, two trimmed by a flat 0.02 m)
+# didn't match the CORNER POSTS' own footprint (POST=0.028 m), so a sliver
+# of every rail still sat inside the post's corner square -- both the
+# rail's and the post's OUTER faces occupy that sliver at the exact same
+# plane, a coincident same-direction face pair, which is what actually
+# rendered as the black corner dots (a genuine trim-vs-rail mismatch, not
+# the rail-vs-rail overlap the earlier comment fixed). Trimming every rail
+# to the posts' own inner boundary (INNER) on BOTH axes leaves the post as
+# the sole owner of the corner square -- rails only ever touch a post along
+# a shared edge, never a shared face.
+INNER = HALF - POST
 for y0, y1 in ((LAN_Y0, LAN_Y0 + 0.025), (LAN_Y1 - 0.03, LAN_Y1)):
-    C.add_box(bm, -HALF, -HALF + 0.02, y0, y1, -HALF, HALF, mat_idx=IRON)   # left, full length
-    C.add_box(bm, HALF - 0.02, HALF, y0, y1, -HALF, HALF, mat_idx=IRON)    # right, full length
-    C.add_box(bm, -HALF + 0.02, HALF - 0.02, y0, y1, -HALF, -HALF + 0.02, mat_idx=IRON)  # front (door side), trimmed
-    C.add_box(bm, -HALF + 0.02, HALF - 0.02, y0, y1, HALF - 0.02, HALF, mat_idx=IRON)    # back, trimmed
+    C.add_box(bm, -HALF, -HALF + 0.02, y0, y1, -INNER, INNER, mat_idx=IRON)   # left, trimmed to fit between the corner posts
+    C.add_box(bm, HALF - 0.02, HALF, y0, y1, -INNER, INNER, mat_idx=IRON)    # right, trimmed
+    C.add_box(bm, -INNER, INNER, y0, y1, -HALF, -HALF + 0.02, mat_idx=IRON)  # front (door side), trimmed
+    C.add_box(bm, -INNER, INNER, y0, y1, HALF - 0.02, HALF, mat_idx=IRON)    # back, trimmed
 # glass panes, 3 fixed sides (back, left, right) inset between rails/posts
 gy0, gy1 = LAN_Y0 + 0.03, LAN_Y1 - 0.035
 gh = HALF - POST + 0.006
@@ -108,23 +115,59 @@ latch_cx, latch_cz = (HALF - POST / 2), -(HALF - POST / 2) - 0.02
 C.add_box(bm, latch_cx - 0.02, latch_cx + 0.025, LAN_Y0 + 0.14, LAN_Y0 + 0.19,
           latch_cz - 0.02, latch_cz + 0.02, mat_idx=IRON)
 
-# gas jet + burner, visible through the glass
+# ---- lantern floor: round-3 rebuild -- there was no floor at all under
+# the burner, just the small-radius column collar far below the lantern's
+# much wider square footprint, an open, near-enclosed gap that read as an
+# unlit black blob next to the burner. A real floor plate closes it, with
+# a genuine square pass-through (not a texture) for the gas feed pipe --
+# built the same trimmed-strip way as the frame rails above, so the strips
+# never overlap each other or the corner posts, and the pass-through's own
+# side faces (each strip's inner face) come for free as real reveal walls.
+HOLE = 0.05
+FLOOR_Y0, FLOOR_Y1 = LAN_Y0, LAN_Y0 + 0.02
+C.add_box(bm, -INNER, -HOLE, FLOOR_Y0, FLOOR_Y1, -INNER, INNER, mat_idx=IRON)
+C.add_box(bm, HOLE, INNER, FLOOR_Y0, FLOOR_Y1, -INNER, INNER, mat_idx=IRON)
+C.add_box(bm, -HOLE, HOLE, FLOOR_Y0, FLOOR_Y1, -INNER, -HOLE, mat_idx=IRON)
+C.add_box(bm, -HOLE, HOLE, FLOOR_Y0, FLOOR_Y1, HOLE, INNER, mat_idx=IRON)
+
+# gas jet + burner, rising through the floor's pass-through, visible
+# through the glass
 C.add_cylinder(bm, 0, 0, LAN_Y0 + 0.02, LAN_Y0 + 0.14, 0.012, segments=10, mat_idx=IRON)
 C.add_cylinder(bm, 0, 0, LAN_Y0 + 0.14, LAN_Y0 + 0.18, 0.022, segments=10, mat_idx=IRON,
                radius_top=0.016)
 
-# ---- vent cap: 4-sided pyramid with proud eave + louvre fins ----
+# ---- vent cap: 4-sided pyramid over a genuine ribbed louvre collar.
+# Round-1 item, still unfixed through r2: the old "fins" were solid pegs
+# stuck on the OUTSIDE of an otherwise sealed band, so there was no actual
+# gap for a camera (or air) to pass through -- a stranger could not tell
+# they were meant to be vents. Rebuilt as 3 proud collar rings stacked on
+# a slimmer recessed core shaft, with a real open step between each ring --
+# genuine geometry that catches light on the proud rings and casts shadow
+# into the recesses between them, not a smooth cone with a normal map.
 CAP_Y0, CAP_Y1 = LAN_Y1, LAN_Y1 + 0.13
-C.add_cylinder(bm, 0, 0, CAP_Y0, CAP_Y0 + 0.02, HALF + 0.03, segments=4, mat_idx=IRON)
-C.add_cylinder(bm, 0, 0, CAP_Y0 + 0.02, CAP_Y1, HALF + 0.03, segments=4, mat_idx=IRON,
-               radius_top=0.015)
-# louvre fins around the cap base -- real gaps between them
-n_fins = 10
-for i in range(n_fins):
-    a = 2 * math.pi * i / n_fins
-    fx, fz = (HALF + 0.045) * math.cos(a), (HALF + 0.045) * math.sin(a)
-    C.add_box(bm, fx - 0.012, fx + 0.012, CAP_Y0 - 0.03, CAP_Y0 + 0.01,
-              fz - 0.012, fz + 0.012, mat_idx=IRON)
+# round-3 fix: a segments=4 cylinder's verts sit on the +-x/+-z axes (facing
+# the lantern's flat glass sides), so its square is rotated 45 deg from the
+# lantern's own square footprint (whose CORNER posts sit on the diagonals,
+# at radius sqrt2*(HALF-POST/2) = 0.192 m). At the old CAP_HALF=0.18 with no
+# offset, the cap's flats (apothem = CAP_HALF*cos45 = 0.127 m) fell well
+# short of each corner post's own radius, leaving an uncovered, unlit void
+# right above every post -- the pure-black trapezoid in gaslamp_vent.png.
+# Rotating the cap 45 deg puts its VERTS over the corner posts instead, and
+# CAP_HALF is widened so those verts clear the post radius with margin.
+CAP_HALF = HALF + 0.05  # 0.20 m, clears the 0.192 m post-corner radius
+VENT_ROT = 45.0
+N_RINGS = 3
+RING_T, GAP_T = 0.018, 0.014
+for k in range(N_RINGS):
+    ry0 = CAP_Y0 + k * (RING_T + GAP_T)
+    ry1 = ry0 + RING_T
+    C.add_cylinder(bm, 0, 0, ry0, ry1, CAP_HALF, segments=4, mat_idx=IRON,
+                    angle_offset_deg=VENT_ROT)
+BAND_Y1 = CAP_Y0 + N_RINGS * (RING_T + GAP_T) - GAP_T
+C.add_cylinder(bm, 0, 0, CAP_Y0, BAND_Y1, HALF, segments=4, mat_idx=IRON,
+                angle_offset_deg=VENT_ROT)  # recessed core linking the rings
+C.add_cylinder(bm, 0, 0, BAND_Y1, CAP_Y1, CAP_HALF, segments=4, mat_idx=IRON,
+               radius_top=0.015, angle_offset_deg=VENT_ROT)  # roof pyramid
 # finial knob
 C.add_cylinder(bm, 0, 0, CAP_Y1, CAP_Y1 + 0.02, 0.02, segments=10, mat_idx=IRON)
 
@@ -134,6 +177,11 @@ C.smart_uv(obj)
 
 bpy.context.view_layer.objects.active = obj
 obj.select_set(True)
+
+# save BEFORE export/render, so the blend's mtime is provably the earliest
+# of the three (provenance requirement: blend <= glb < renders)
+bpy.ops.wm.save_as_mainfile(
+    filepath="C:/Users/USERNAME/Downloads/projects/victorian-london/blender/B3/gaslamp.blend")
 
 C.export_glb([obj], C.MODELS_DIR + "/gaslamp.glb")
 
@@ -152,15 +200,19 @@ cam_34 = C.add_camera("cam_34", C.V(2.8, eye, 3.5), C.V(0, 1.15, 0), lens=40)
 # denoiser noise/black blotches even after the lighting fix; the mantle is
 # clear of that and is the part that actually reads as "a burner"
 cam_detail = C.add_camera("cam_detail", C.V(0.45, 2.02, -0.55), C.V(0.05, 1.96, 0.02), lens=42)
+# vent-cap close-up (round-3 fixlist item): the 3 stacked collar rings with
+# open steps between them (CAP_Y0=1.85+... up to CAP_Y1) are the louvre --
+# never had a dedicated shot, so the geometry existed but was unevidenced.
+# Close, slightly below eye level, angled up at the cap so the proud rings
+# catch the key light and the recessed gaps between them read as shadow.
+cam_vent = C.add_camera("cam_vent", C.V(0.42, 2.10, -0.42), C.V(0.0, 2.32, 0.0), lens=55)
 
 C.setup_render('CYCLES', samples=48, res=(960, 540), device='CPU')
 
 backup = C.apply_clay_override([obj])
-for cam, name in ((cam_face, "face"), (cam_34, "34"), (cam_detail, "detail")):
+for cam, name in ((cam_face, "face"), (cam_34, "34"), (cam_detail, "detail"), (cam_vent, "vent")):
     bpy.context.scene.camera = cam
     C.render_to(C.RENDER_DIR + f"/gaslamp_{name}.png")
 C.restore_materials([obj], backup)
 
-bpy.ops.wm.save_as_mainfile(
-    filepath="C:/Users/USERNAME/Downloads/projects/victorian-london/blender/B3/gaslamp.blend")
 print("DONE gaslamp")

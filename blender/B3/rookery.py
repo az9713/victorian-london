@@ -440,6 +440,11 @@ C.smart_uv(obj)
 bpy.context.view_layer.objects.active = obj
 obj.select_set(True)
 
+# save BEFORE export/render, so the blend's mtime is provably the earliest
+# of the three (provenance requirement: blend <= glb < renders)
+bpy.ops.wm.save_as_mainfile(
+    filepath="C:/Users/USERNAME/Downloads/projects/victorian-london/blender/B3/rookery.blend")
+
 C.export_glb([obj], C.MODELS_DIR + "/rookery.glb")
 
 # ---- render rig ----
@@ -469,7 +474,13 @@ cam_ctx = C.add_camera("cam_ctx", C.V(32, 20, -31), C.V(0, 6, 2), lens=22)
 # BRIEF-COMMON's minimum, which is allowed and is the honest fix here.
 boarded_xc = bay_x(3)
 boarded_y = (3.5 + FLOOR_H * 0.30 + 3.5 + FLOOR_H * 0.78) / 2  # bay (3,1) centre
-cam_boarded = C.add_camera("cam_boarded", C.V(boarded_xc, boarded_y + 0.1, FRONT_Z0 - 2.2),
+# round-3 evidence fix: dead-on/straight-flat framing put the sun near-
+# parallel to the plank faces, so the small (2 cm) gaps between planks cast
+# almost no shadow and the boarding read as a blank recess. Shifted off-axis
+# and pulled back slightly so the raking key light rakes across the plank
+# faces and the gaps read as real shadow lines, with the sill/lintel now
+# also inside the frame for context.
+cam_boarded = C.add_camera("cam_boarded", C.V(boarded_xc + 1.1, boarded_y + 0.35, FRONT_Z0 - 2.6),
                             C.V(boarded_xc, boarded_y, FRONT_Z0), lens=42)
 cam_yard = C.add_camera("cam_yard", C.V(10, 2.6, -0.4), C.V(17.7, 1.3, -0.5), lens=28)
 
@@ -482,6 +493,4 @@ for cam, name in ((cam_face, "face"), (cam_34, "34"), (cam_detail, "detail"),
     C.render_to(C.RENDER_DIR + f"/rookery_{name}.png")
 C.restore_materials([obj], backup)
 
-bpy.ops.wm.save_as_mainfile(
-    filepath="C:/Users/USERNAME/Downloads/projects/victorian-london/blender/B3/rookery.blend")
 print("DONE rookery build+export+render")

@@ -128,14 +128,21 @@ def add_quad(bm, p0, p1, p2, p3, mat_idx=0):
 
 
 def add_cylinder(bm, cx, cz, y0, y1, radius, segments=16, mat_idx=0,
-                  radius_top=None, cap_bottom=True, cap_top=True):
-    """Vertical cylinder / frustum in brief space. cx,cz = centre, y0..y1 height."""
+                  radius_top=None, cap_bottom=True, cap_top=True,
+                  angle_offset_deg=0.0):
+    """Vertical cylinder / frustum in brief space. cx,cz = centre, y0..y1 height.
+    angle_offset_deg: rotates the vertex ring -- needed when a low-segment
+    (square/octagon) cylinder must line up its CORNERS with another box's
+    corners rather than its face centres (the default segments=4 phase puts
+    verts on the +-x/+-z axes, i.e. facing the box's flat sides, not its
+    diagonal corners)."""
     if radius_top is None:
         radius_top = radius
+    off = math.radians(angle_offset_deg)
     bottom = []
     top = []
     for i in range(segments):
-        a = 2 * math.pi * i / segments
+        a = 2 * math.pi * i / segments + off
         bx = cx + radius * math.cos(a)
         bz = cz + radius * math.sin(a)
         tx = cx + radius_top * math.cos(a)
@@ -277,7 +284,14 @@ def setup_render(engine='CYCLES', samples=32, res=(960, 540), device='CPU'):
     bg = world.node_tree.nodes.get("Background")
     if bg:
         bg.inputs[0].default_value = (0.45, 0.45, 0.48, 1.0)
-        bg.inputs[1].default_value = 1.8
+        # round-3 fix: 1.8 strength made the ambient world (not the sun) the
+        # dominant light source everywhere -- every frame's pixel values sat
+        # in a narrow ~90-200/255 band regardless of geometry (measured with
+        # a histogram check), reading as flat/hazy/"washed out" even though
+        # nothing actually clipped to white. Dropped so the sun is the real
+        # key again; still bright enough that a fully enclosed recess floor
+        # (no direct sun) never goes pure black.
+        bg.inputs[1].default_value = 0.75
     # recessed/enclosed geometry (window reveals, niches, panel mouldings)
     # needs enough diffuse bounces to pick up any ambient at all -- default
     # is usually fine but this is cheap insurance against black pockets.
@@ -336,6 +350,15 @@ def apply_clay_override(objects):
         bsdf = clay.node_tree.nodes.get("Principled BSDF")
         bsdf.inputs["Base Color"].default_value = CLAY_GREY
         bsdf.inputs["Roughness"].default_value = 0.85
+        # Round-3 fix: the default Principled BSDF still carries ~0.5
+        # specular reflectance even at roughness 0.85. On a large flat
+        # surface (gy-flank's blind wall) lit by a nearby area fill light,
+        # that produced a soft glossy hotspot that blew large parts of the
+        # frame to near-white ("ghost hotspot" / gy-flank_34 white-out).
+        # A clay override should be purely diffuse -- zeroing specular
+        # removes the hotspot without touching any light or geometry.
+        if "Specular IOR Level" in bsdf.inputs:
+            bsdf.inputs["Specular IOR Level"].default_value = 0.0
     backup = {}
     for o in objects:
         if o.type != 'MESH':

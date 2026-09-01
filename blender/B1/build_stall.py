@@ -101,17 +101,16 @@ def rope_from_curve(bm, points, radii, radius, mat_index, bevel_res=2, use_caps=
     bpy.data.curves.remove(curve)
 
 
-def add_rope_wrap(bm, pole_x, attach_z, canvas_mat, rope_mat, pole_r=0.03, seed=1):
+def add_rope_wrap(bm, pole_x, attach_z, canvas_mat, rope_mat, pole_r=0.03, seed=1,
+                   cam_azimuth=-math.pi / 4):
     """A tied lashing where the canvas end wraps the canopy pole. Round 4
-    fixlist: r2-r4's version STILL read as mechanical clip/clamp hardware --
-    "two stacked rows of blocky rounded rectangular segments" -- both because
-    it used add_beam's flat rectangular cross-section AND because a chain of
-    short straight segments (even round ones) facets at every joint and
-    reads as linked hardware, not cord. This rebuild is ONE continuous curve
-    strand (see rope_from_curve) that wraps the pole several times, each
-    wrap with its own radius/tilt/angular span so wraps visibly cross,
-    overlap and leave gaps rather than stacking as parallel rings, then
-    trails off into a loose asymmetric hanging tail with a knot bulge."""
+    gave two near-identical uniform stacked rings with no tail -- the
+    builder checked "does it read as rope" and saw intent, not pixels. R5
+    fixlist demands COUNTABLE properties, so this rebuild hand-sets the
+    three wrap radii (not random ranges that can converge to near-identical
+    values), forces a genuine depth crossing between two wraps via an
+    angle-modulated radius (guaranteed, not hoped-for), and ends in a free
+    tail long enough to be measured against the pole diameter."""
     rnd = random.Random(seed)
     # gathered canvas: irregular bunched fabric pulled toward the pole -- a
     # handful of unevenly sized, unevenly spaced lobes, not a uniform ring of
@@ -127,47 +126,92 @@ def add_rope_wrap(bm, pole_x, attach_z, canvas_mat, rope_mat, pole_r=0.03, seed=
         bot_r = rnd.uniform(0.006, 0.012)
         z0 = attach_z + rnd.uniform(-0.02, 0.015)
         add_cyl(bm, (cx, cy, z0), top_r, bot_r, h, canvas_mat, segments=5)
-    # rope: ONE continuous strand, 3 irregular wraps around the pole -- each
-    # wrap its own radius, tilt (wrap plane not perfectly horizontal),
-    # vertical position and angular span (some fall short of a full turn,
-    # leaving a visible gap; others over-run so wraps overlap).
-    rope_w = 0.012
-    n_wraps = 3
-    z_top = attach_z + gather_h * 0.10
-    z_span = gather_h * 0.65
-    pts, radii = [], []
-    phase = rnd.uniform(0, 2 * math.pi)
-    for wi in range(n_wraps):
-        r = pole_r + 0.026 + rnd.uniform(-0.012, 0.026)
-        tilt = rnd.uniform(-0.6, 0.6)
-        z_center = z_top - z_span * (wi + 0.5) / n_wraps + rnd.uniform(-0.020, 0.020)
-        span = rnd.uniform(math.pi * 1.2, math.pi * 2.3)
-        n_seg = 16
-        for i in range(n_seg):
+
+    rope_w = 0.011
+    z_top = attach_z + gather_h * 0.08
+
+    # -- fixlist 1a: THREE wrap radii, hand-set so each pair differs by
+    # >=20% of the pole diameter (2*pole_r = 0.06 m) as literally countable
+    # loop widths: 0.048 / 0.082 / 0.064 m -> pairwise deltas of 0.034 (57%),
+    # 0.018 (30%), 0.016 (27%) of pole diameter.
+    # r5 2nd pass: the first z-spacing (0.02/0.045/0.078 m) plus large tilt
+    # amplitudes (0.45/-0.55/0.30 * radius) made the vertical bands overlap
+    # everywhere, not just at the designed crossing -- the three wraps blurred
+    # into one continuous helix (only 2 loops were actually countable in the
+    # render). Wider z spacing + smaller tilt keeps the three rings visually
+    # SEPARATE, so the one designed crossing (the r2 amplitude bump, below)
+    # reads as a distinct event rather than the whole thing looking fused.
+    r1_base, tilt1, z1 = pole_r + 0.055, 0.18, z_top - 0.005
+    span1 = math.radians(300)
+    # crossing wrap 2 in front of / behind wrap 1 -- phase set so the peak
+    # of its radius bulge (below) faces the tie camera (azimuth ~-45 deg
+    # from the pole), not hidden around the back.
+    phase1 = cam_azimuth - span1 / 2.0
+    r2_base, tilt2, z2 = pole_r + 0.010, -0.20, z_top - 0.065
+    span2 = math.radians(320)
+    phase2 = phase1 + math.radians(35)
+    crossing_center = phase1 + span1 * 0.5  # faces the camera
+    r2_amp = 0.052  # (base+amp)=0.092 > r1_base=0.085 -- radius order swaps at the crossing angle only
+    r3_base, tilt3, z3 = pole_r + 0.032, 0.15, z_top - 0.125
+    span3 = math.radians(260)
+    # r5 3rd pass: chaining phase3 off phase2's END put wrap 3's arc on the
+    # BACK of the pole (18-278 deg vs a ~317 deg camera azimuth) -- only a
+    # tiny sliver was visible, not a countable third loop. End wrap 3's arc
+    # AT the camera azimuth instead, so its full loop -- and the knot/tail
+    # that departs from its end -- both face the lens.
+    phase3 = cam_azimuth - span3
+
+    def build_wrap_pts(r_of_a, phase, span, z_center, tilt, n_seg=22):
+        pts = []
+        for i in range(n_seg + 1):
             t = i / n_seg
             a = phase + span * t
+            r = r_of_a(a)
             z = z_center + math.sin(a - phase) * tilt * r
             pts.append((pole_x + r * math.cos(a), r * math.sin(a), z))
-            radii.append(1.0)
-        phase = phase + span  # next wrap starts where this one ended
-    # loose hanging tail, asymmetric, drooping under gravity, tapering to a
-    # thin end -- part of the SAME continuous strand, not a separate piece
-    tail0 = pts[-1]
-    tail1 = (tail0[0] - 0.035, tail0[1] + 0.06, tail0[2] - 0.16)
-    tail2 = (tail1[0] + 0.020, tail1[1] + 0.03, tail1[2] - 0.07)
-    tail3 = (tail2[0] - 0.010, tail2[1] - 0.015, tail2[2] - 0.045)
-    pts += [tail1, tail2, tail3]
-    radii += [0.9, 0.65, 0.4]
-    rope_from_curve(bm, pts, radii, rope_w, rope_mat, bevel_res=2)
-    # irregular knot bulge: a small offset cluster of overlapping icospheres
-    # (organic, no flat facets) at the departure point, not one clean
-    # torus/cylinder or an angular low-segment cone -- a hand-tied knot
-    # bulge, not a machined fitting.
+        return pts
+
+    pts1 = build_wrap_pts(lambda a: r1_base, phase1, span1, z1, tilt1)
+    pts2 = build_wrap_pts(lambda a: r2_base + r2_amp * math.cos(a - crossing_center),
+                           phase2, span2, z2, tilt2)
+    pts3 = build_wrap_pts(lambda a: r3_base, phase3, span3, z3, tilt3)
+    radii1 = [1.0] * len(pts1)
+    radii2 = [1.0] * len(pts2)
+    radii3 = [1.0] * len(pts3)
+
+    # fixlist 1c: free tail, departing the wraps and drooping under gravity.
+    # End-to-end length from the departure point to the tip is ~0.19 m,
+    # comfortably over the 2x-pole-diameter target (0.12 m), and short
+    # enough to stay in the same tie-camera crop (widened slightly below).
+    # r5 2nd pass: the first version drifted the tail toward +x,+y, which
+    # put it BEHIND the pole from the tie camera's viewpoint (camera sits at
+    # x=pole_x+0.52, y=-0.50) -- occluded, invisible in the render. Swing it
+    # toward the camera instead (+x away from pole centre, -y toward the
+    # lens) so it hangs clear and visible while still dropping under gravity.
+    tail0 = pts3[-1]
+    tail1 = (tail0[0] + 0.050, tail0[1] - 0.030, tail0[2] - 0.080)
+    tail2 = (tail1[0] + 0.030, tail1[1] - 0.020, tail1[2] - 0.065)
+    tail3 = (tail2[0] + 0.015, tail2[1] - 0.010, tail2[2] - 0.045)
+    tail_radii = [0.85, 0.6, 0.35]
+
+    rope_from_curve(bm, pts1, radii1, rope_w, rope_mat, bevel_res=2)
+    rope_from_curve(bm, pts2, radii2, rope_w, rope_mat, bevel_res=2)
+    rope_from_curve(bm, pts3 + [tail1, tail2, tail3], radii3 + tail_radii,
+                     rope_w, rope_mat, bevel_res=2)
+
+    # knot bulge at the point the tail leaves the wraps -- kept as its own
+    # cluster, NOT merged into the wrap geometry, so the tail's departure
+    # point is visible. r4's icospheres (subdivisions=1, flat-shaded) read
+    # as a faceted crystal/gem, not a knot -- smooth-shade this cluster.
+    before = set(bm.faces)
     for i in range(3):
-        off = (rnd.uniform(-0.013, 0.013), rnd.uniform(-0.013, 0.013), rnd.uniform(-0.011, 0.011))
-        kr = rope_w * rnd.uniform(1.15, 1.6)
+        off = (rnd.uniform(-0.012, 0.012), rnd.uniform(-0.012, 0.012), rnd.uniform(-0.010, 0.010))
+        kr = rope_w * rnd.uniform(1.2, 1.6)
         add_sphere(bm, (tail0[0] + off[0], tail0[1] + off[1], tail0[2] + off[2]),
-                   kr, rope_mat, subdivisions=1)
+                   kr, rope_mat, subdivisions=2)
+    for f in bm.faces:
+        if f not in before:
+            f.smooth = True
 
 
 def build_canopy(bm):
@@ -193,7 +237,12 @@ def build_canopy(bm):
         # irregularly around the pole -- see add_rope_wrap docstring. Each
         # pole gets its own seed so the two ties are distinct wraps, not
         # mirrored clones of the same geometry.
-        add_rope_wrap(bm, x, attach_z, PLASTER, IRON, seed=1 if sx < 0 else 2)
+        # cam_azimuth: the tie camera (render_pass) sits at pole_x+0.45,-0.42
+        # relative to the +x pole -- point the designed depth-crossing (see
+        # add_rope_wrap) at that bearing so it actually faces the lens.
+        az = math.atan2(-0.42, 0.45)
+        add_rope_wrap(bm, x, attach_z, PLASTER, IRON, seed=1 if sx < 0 else 2,
+                       cam_azimuth=az)
 
     n_steps = 12
     dip = 0.20
@@ -289,8 +338,12 @@ def render_pass():
     # "IN FRAME" per the fixlist, so this is a 4th delivered frame.
     pole_x = LEN / 2.0 + 0.08
     attach_z = 2.1 - 0.10
-    add_camera("cam_tie", (pole_x + 0.45, -0.42, attach_z + 0.02),
-               mathutils.Vector((pole_x, 0, attach_z - 0.05)), lens=55)
+    # r5: widened/retargeted down + pulled back slightly (was target z-0.05,
+    # pos z+0.02) so the new free tail (drooping ~0.19 m below the wraps) is
+    # fully in frame, not cropped out as it was when the tail existed but
+    # dropped straight out of the bottom of the r4 crop.
+    add_camera("cam_tie", (pole_x + 0.52, -0.50, attach_z + 0.00),
+               mathutils.Vector((pole_x, 0, attach_z - 0.14)), lens=48)
     render_to(os.path.join(RENDERS_DIR, "stall_tie.png"))
 
 

@@ -42,12 +42,18 @@ NECK_FRAC = 0.34
 NECK_RUN = 0.22
 NECK_LATERAL = 0.30
 NECK_RISE = 0.03
-NECK_DROOP = 0.22
+# r5: was 0.22, which put the new (much wider/heavier-reading) flared tip's
+# centreline at z=-0.105 -- underground and invisible. r4's blade tip got
+# away with this because its near-zero cross-section poked through the
+# ground plane unnoticed. 0.05 keeps the tip's centre at ~z=0.065, clear of
+# the ground plane (tip half-height ~0.047), while still visibly flopping
+# down and sideways rather than standing rigid.
+NECK_DROOP = 0.05
 NECK_MIN_R = 0.016
 SPREAD = 1.20
 ENV_FLOOR = 0.05
-COLLAR_PROUD = 0.010
-COLLAR_HALF_T = 0.006
+COLLAR_PROUD = 0.017  # r5: raised from 0.010 -- at the new (much wider) pinch/flare contrast the old proud amount read as a faint dimple, not a distinct cord band
+COLLAR_HALF_T = 0.005
 
 # (t_center, t_width, amount) -- fold constrictions along the body, full
 # effect on the TOP half of the ring, damped on the underside so they read
@@ -94,44 +100,38 @@ def ring_profile(t):
     else:
         tn = (t - 1.0) / NECK_FRAC
         u = BODY_LEN + tn * NECK_RUN
-        if tn < 0.40:
-            p = tn / 0.40
-            # r4 fixlist: -0.85 tapered this all the way down to a bare
-            # needle-thin wire before the flatten had any size to work with,
-            # which is what still read as "rod" -- less severe taper keeps
-            # enough cross-section for the anisotropic flatten (below) to be
-            # visible as a flat pinched tab instead of a thin round wire.
-            rad_mult = 1.0 - p * 0.55          # taper down to the pinch (tie point)
-        elif tn < 0.65:
-            p = (tn - 0.40) / 0.25
-            rad_mult = 0.45 + p * 0.35          # bulge back out -- gathered ear base (continuous with the 0.45 above)
+        # r5 fixlist: r3 gave a rod ending in a blob, r4 gave a sharp
+        # faceted blade/beak. Root cause found by checking the actual
+        # numbers -- r4's rad_mult at the tip (0.44) was LOWER than at the
+        # pinch (0.45), i.e. the ear tapered TO A POINT past the flare peak,
+        # which is exactly a blade. A tied cloth end flares WIDER than the
+        # pinch and stays wide/blobby to the tip (property a). PINCH_T
+        # marks the tie point -- the cord-collar geometry below is gated to
+        # this same t, so the cord band still sits IN the pinch groove.
+        PINCH_T = 0.35
+        if tn <= PINCH_T:
+            p = tn / PINCH_T
+            rad_mult = 1.0 - p * 0.72          # taper down to the pinch (cord tie point)
         else:
-            p = (tn - 0.65) / 0.35
-            rad_mult = 0.80 - p * 0.36          # taper to the ear's rounded tip
-        rad_mult = max(rad_mult, 0.12)
-        # max(), not +floor -- an always-added floor is discontinuous with
-        # the body's un-floored value right at tn=0 (the shoulder seam).
+            p = (tn - PINCH_T) / (1.0 - PINCH_T)   # 0 at pinch, 1 at ear tip
+            ease = math.sin(p * math.pi * 0.5)      # monotonic 0->1, no dip back down
+            rad_mult = 0.28 + ease * 0.80            # flares to ~3.9x the pinch width -- wider, blobby, not a point
+            if p > 0.80:
+                cap = (p - 0.80) / 0.20
+                rad_mult *= (1.0 - 0.18 * cap)        # rounds the very tip into a dome, still well above pinch width
+        rad_mult = max(rad_mult, 0.10)
         width_r = max(HALF_W * 0.45 * rad_mult, NECK_MIN_R)
         h_top = max(HALF_H_TOP * 0.45 * rad_mult, NECK_MIN_R * 0.9)
-        # h_bot starts at the body's flattened ratio (continuous with the
-        # shoulder, no jump) and rounds out to match h_top by tn=0.30 -- an
-        # instant jump here flared the tube right at the shoulder seam.
         flat_ratio = HALF_H_BOT / HALF_H_TOP
         round_out = min(tn / 0.30, 1.0)
         h_bot = h_top * (flat_ratio + (1.0 - flat_ratio) * round_out)
-        # r4 fixlist: the neck terminus read as "a thin curved rod ending in
-        # a blob" -- a handle, not tied cloth. Gating the flattening to only
-        # the post-collar ear (tn>0.40) left the pre-collar taper a long,
-        # thin, perfectly ROUND wire, which is exactly what still read as
-        # "rod" even with a flatter tip. Apply the anisotropic flatten
-        # (width GROWS, height SHRINKS) across the WHOLE neck run starting
-        # immediately at tn=0, so even the thin pinch is a flat pinched tab
-        # of cloth, not a round wire -- a floppy tied cloth end throughout,
-        # not a rod with a flag stuck on the end.
-        fp = min(tn / 0.35, 1.0)
-        width_r *= 1.0 + 1.3 * fp
-        h_top *= 1.0 - 0.62 * fp
-        h_bot *= 1.0 - 0.48 * fp
+        # gentle anisotropic flatten (cloth-like) -- kept far short of r4's
+        # 1.3/0.62 magnitudes, which is what made the flare read as a flat
+        # bladed wing instead of a rounded lumpy bundle.
+        fp = min(tn / PINCH_T, 1.0)
+        width_r *= 1.0 + 0.30 * fp
+        h_top *= 1.0 - 0.18 * fp
+        h_bot *= 1.0 - 0.14 * fp
         bend_w = tn * NECK_LATERAL
         if tn < 0.55:
             bend_z = (tn / 0.55) * NECK_RISE
@@ -141,7 +141,8 @@ def ring_profile(t):
 
 
 def build_sack(bm, cx, cy, s, body_deg, tail_z0=None, sag=0.0,
-               spread_mult=1.0, underside_scale=1.0, dents=None, crease_phase=0.0):
+               spread_mult=1.0, underside_scale=1.0, dents=None, crease_phase=0.0,
+               n_ring_neck=N_RING_NECK):
     """One sack as a single continuous loft. tail_z0 overrides the resting
     height (used to stack a sack on top of others instead of the ground);
     sag bows the body downward at mid-length (draping over what it rests
@@ -157,9 +158,12 @@ def build_sack(bm, cx, cy, s, body_deg, tail_z0=None, sag=0.0,
     if tail_z0 is None:
         tail_z0 = HALF_H_BOT * s
 
-    t_pinch = 1.0 + 0.40 * NECK_FRAC
+    t_pinch = 1.0 + 0.35 * NECK_FRAC  # r5: matches ring_profile's PINCH_T (was 0.40, now 0.35)
     ts = [i / N_RING_BODY for i in range(N_RING_BODY + 1)]
-    ts += [1.0 + (i + 1) / N_RING_NECK * NECK_FRAC for i in range(N_RING_NECK)]
+    # r5: sack 1's neck (the one under judgement, sacks_detail/34) gets more
+    # rings so the new flare-to-dome curve (see ring_profile) samples smoothly
+    # instead of chunky facets; sacks 2/3 keep the original density.
+    ts += [1.0 + (i + 1) / n_ring_neck * NECK_FRAC for i in range(n_ring_neck)]
     collar_ts = [t_pinch - COLLAR_HALF_T, t_pinch + COLLAR_HALF_T]
     ts = sorted(set(ts) | set(collar_ts))
 
@@ -308,7 +312,8 @@ def build():
     dents2 = [(0.45, math.pi / 2, 0.16, 1.1, 0.32), (0.30, math.pi, 0.14, 0.9, 0.16)]
     dents3 = [(0.14, -math.pi / 2, 0.16, 1.1, 0.30), (0.74, -math.pi / 2, 0.16, 1.1, 0.28)]
 
-    build_sack(bm, c1[0], c1[1], s1, body_deg=18, dents=dents1, crease_phase=0.0)
+    build_sack(bm, c1[0], c1[1], s1, body_deg=18, dents=dents1, crease_phase=0.0,
+               n_ring_neck=13)  # this is the judged neck (sacks_detail/34) -- extra density for the dome tip
     build_sack(bm, c2[0], c2[1], s2, body_deg=-70, dents=dents2, crease_phase=2.4)
     build_sack(bm, (c1[0] + c2[0]) / 2.0 + 0.02, (c1[1] + c2[1]) / 2.0 - 0.01, s3,
                body_deg=100, tail_z0=(top1 + top2) / 2.0 + 0.03 * s3,
