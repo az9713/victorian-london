@@ -213,8 +213,14 @@ def window_zface(face_z, sign, xc, y_sill, y_lintel, width=1.1, recess=WALL_THIC
     C.add_box(bm, xl - 0.05, xr + 0.05, y_sill - 0.06, y_sill,
               min(face_z, face_z - sign * SILL_PROUD), max(face_z, face_z - sign * SILL_PROUD),
               mat_idx=BRICK)  # main sill block
+    # nosing occupies only the OUTER band, beyond the main block's own
+    # proud extent (SILL_PROUD..NOSE_PROUD) -- round-4 fix: starting it at
+    # face_z made it fully re-cover the main block's own volume over their
+    # shared y-range, a coincident embedded-box overlap that produced the
+    # pure-black region found in rookery_yard.png.
     C.add_box(bm, xl - 0.05, xr + 0.05, y_sill - 0.025, y_sill,
-              min(face_z, face_z - sign * NOSE_PROUD), max(face_z, face_z - sign * NOSE_PROUD),
+              min(face_z - sign * SILL_PROUD, face_z - sign * NOSE_PROUD),
+              max(face_z - sign * SILL_PROUD, face_z - sign * NOSE_PROUD),
               mat_idx=BRICK)  # drip nosing, proud of the block above it
     # proud lintel/arch head above the opening -- round-4 fixlist item 2a:
     # the recess soffit alone (flush with the reveal) doesn't read as a
@@ -260,9 +266,22 @@ def window_zface(face_z, sign, xc, y_sill, y_lintel, width=1.1, recess=WALL_THIC
         bz0, bz1 = min(bar_z, bar_z - sign * 0.01), max(bar_z, bar_z - sign * 0.01)
         for cx in col_xs:
             C.add_box(bm, cx - 0.012, cx + 0.012, y_sill, y_lintel, bz0, bz1, mat_idx=PAINT_DARK)
+        # horizontal bars are trimmed to fit strictly BETWEEN the vertical
+        # dividers ("picture-frame" construction, same fix already used
+        # elsewhere in this file) -- a full-width bar crossing a full-height
+        # divider is two solids sharing volume at every crossing, which is
+        # exactly what produced the small black dots at each grid
+        # intersection in the round-4 window render.
+        col_edges = [xl] + col_xs + [xr]
         for hy in (row_lower, row_upper):
-            C.add_box(bm, xl, xr, hy - 0.012, hy + 0.012, bz0, bz1, mat_idx=PAINT_DARK)
-        C.add_box(bm, xl, xr, ym - 0.022, ym + 0.022, bz0, bz1, mat_idx=PAINT_DARK)  # meeting rail
+            for i in range(3):
+                sx0 = col_edges[i] + (0.012 if i > 0 else 0.0)
+                sx1 = col_edges[i + 1] - (0.012 if i < 2 else 0.0)
+                C.add_box(bm, sx0, sx1, hy - 0.012, hy + 0.012, bz0, bz1, mat_idx=PAINT_DARK)
+        for i in range(3):
+            sx0 = col_edges[i] + (0.012 if i > 0 else 0.0)
+            sx1 = col_edges[i + 1] - (0.012 if i < 2 else 0.0)
+            C.add_box(bm, sx0, sx1, ym - 0.022, ym + 0.022, bz0, bz1, mat_idx=PAINT_DARK)  # meeting rail
 
 
 def string_course(face_z, x0, x1, y):
