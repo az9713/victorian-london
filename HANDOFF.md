@@ -47,6 +47,32 @@ Pipeline restarted after the pause. Fresh builders `builder-B1-r5b` and
 BRIEF-COMMON.md + batch brief + its fixlist verbatim + the WIP resume state
 below. Orchestration only on Opus 5.
 
+### Live loop state (update every round)
+- **B3 trajectory: r2 min 3 → r3 min 2 → r4 IN FLIGHT.** r3 judged FAIL min 2.
+  Scores r3: gy-flank 2, rookery 3, viaduct-module 3, gaslamp 3, pillarbox 4.
+  The r2→r3 drop is NOT a regression — nothing was un-built. The r3 fixlist
+  asked only for an EVIDENCE pass on gy-flank and never asked whether the door
+  recess contains a door. It does not: an empty void, no leaf/hinge/handle/
+  threshold. Scope gap in the fixlist, not a builder failure. Banked from r3:
+  viaduct black hole closed + ring reads as a proud order, rookery boarded
+  window PASSES (4 planks, real gaps), gaslamp's 3 black-void bugs fixed,
+  gy-flank barred window would score 4-5 alone. Fixlist `B3-r4.md` (countable
+  properties). `builder-B3-r4` running, gy-flank first (it is the minimum).
+- **B1 r5 delivered (96287fa), under judgment by `judge-B1-r5`.** Builder
+  verified 5 of 6 countable properties already passing; 2c (cord band) FAILED
+  and was fixed — root cause was a collar of 2 rings only 0.0065 m apart both
+  at +0.017 m proud, packing the bump into a knife-thin span that renders as a
+  blade; now 3 rings with a cosine falloff. Plus an unplanned real fix: the
+  trestle peg formula used `COUNTER_H*0.42`, placing it 0.158 m off the true
+  leg crossing (z=0.22), leaving the seam open as up to 9,985 true-black
+  pixels in stall_34/stall_detail. Fixed + strap-plate bracket. Those two
+  frames had been provenance-CLEAN since 19:37 while containing that defect —
+  clean provenance never means correct content.
+- **Quiet budget breach caught by the parent inventory, not by any judge:**
+  sacks.glb was 8,500 tris against an 8,000 prop budget through r3 and r4.
+  Judges see renders, not tri counts. Now 7,956; stall 7,868. LESSON: the
+  parent must diff tri counts against budget every round.
+
 **WIP state measured at resume (precise mtimes, 2026-08-31 PT):**
 - B1 stall: blend 19:37:06 → renders 19:37:12–40 → glb 19:37:41. CLEAN.
 - B1 sacks: blend 19:30:57 → renders 19:31:11+ → glb 19:31:39. CLEAN.
