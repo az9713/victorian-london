@@ -302,9 +302,11 @@ def build_canopy(bm):
     # sag genuinely returns to zero exactly AT each support, and the
     # grommet buttons below land exactly on the ridge). Divisible by 4 so
     # the support x's land on EXISTING grid rows (no extra rows from the
-    # union below) -- 3 sheet segments per cell, the tightest that still
-    # keeps within the 8,000-tri budget once the hem/grommets are added.
-    n_steps = 12
+    # union below). 8 (2 segments per sag cell -- a triangle bump, not a
+    # smooth curve) is the floor forced by the 8,000-tri budget once the
+    # doubled-face hem beads and 3 grommets are counted; still clearly
+    # readable as 4 separate dips at this object's on-screen size.
+    n_steps = 8
     grid_t = sorted(set([i / n_steps for i in range(n_steps + 1)] +
                          [i / (N_SUPPORTS - 1) for i in range(N_SUPPORTS)]))
     dip = 0.09
@@ -360,7 +362,7 @@ def build_canopy(bm):
     # same order as every other bolt/nub already in the budget).
     for x in support_x[1:-1]:
         zt = attach_z  # sag is 0 exactly at a support
-        add_cyl(bm, (x, 0, zt + 0.006), 0.020, 0.020, 0.012, IRON, segments=8)
+        add_cyl(bm, (x, 0, zt + 0.006), 0.020, 0.020, 0.012, IRON, segments=5)
 
 
 def build():
