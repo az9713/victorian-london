@@ -48,30 +48,65 @@ BRIEF-COMMON.md + batch brief + its fixlist verbatim + the WIP resume state
 below. Orchestration only on Opus 5.
 
 ### Live loop state (update every round)
-- **B3 trajectory: r2 min 3 → r3 min 2 → r4 IN FLIGHT.** r3 judged FAIL min 2.
-  Scores r3: gy-flank 2, rookery 3, viaduct-module 3, gaslamp 3, pillarbox 4.
-  The r2→r3 drop is NOT a regression — nothing was un-built. The r3 fixlist
-  asked only for an EVIDENCE pass on gy-flank and never asked whether the door
-  recess contains a door. It does not: an empty void, no leaf/hinge/handle/
-  threshold. Scope gap in the fixlist, not a builder failure. Banked from r3:
-  viaduct black hole closed + ring reads as a proud order, rookery boarded
-  window PASSES (4 planks, real gaps), gaslamp's 3 black-void bugs fixed,
-  gy-flank barred window would score 4-5 alone. Fixlist `B3-r4.md` (countable
-  properties). `builder-B3-r4` running, gy-flank first (it is the minimum).
-- **B1 r5 delivered (96287fa), under judgment by `judge-B1-r5`.** Builder
-  verified 5 of 6 countable properties already passing; 2c (cord band) FAILED
-  and was fixed — root cause was a collar of 2 rings only 0.0065 m apart both
-  at +0.017 m proud, packing the bump into a knife-thin span that renders as a
-  blade; now 3 rings with a cosine falloff. Plus an unplanned real fix: the
-  trestle peg formula used `COUNTER_H*0.42`, placing it 0.158 m off the true
-  leg crossing (z=0.22), leaving the seam open as up to 9,985 true-black
-  pixels in stall_34/stall_detail. Fixed + strap-plate bracket. Those two
-  frames had been provenance-CLEAN since 19:37 while containing that defect —
-  clean provenance never means correct content.
-- **Quiet budget breach caught by the parent inventory, not by any judge:**
-  sacks.glb was 8,500 tris against an 8,000 prop budget through r3 and r4.
-  Judges see renders, not tri counts. Now 7,956; stall 7,868. LESSON: the
-  parent must diff tri counts against budget every round.
+
+**B3 trajectory: r2 min 3 → r3 min 2 → r4 min 3 → r5 IN FLIGHT (`builder-B3-r5`).**
+r4 scores: gy-flank 3, viaduct-module 3, gaslamp 3, rookery 4, pillarbox 4.
+BANKED and off-limits (judge's words): voussoirs "genuinely good discrete
+wedges, clearly cut masonry"; gy-flank door leaf "genuinely good" (5 planks,
+4 gaps, 2 hinges w/ knuckles, latch, threshold); gaslamp collar+braces and
+2x2 lantern mullions; rookery 12-pane sashes + door hardware + privy.
+The r2→r3 dip was never a regression: the r3 fixlist asked only for an
+EVIDENCE pass on gy-flank and never asked whether the door recess contained a
+door. It did not. Scope gap in the fixlist, not a builder failure.
+
+**THE STANDING TRAP — carry this into every future B3/B1 round.** The r4 judge
+concluded the batch is "bottlenecked by render/evidence choices, not by missing
+geometry." That is HALF true and acting on only that half fails the next round.
+When a modelled feature does not register in a frame, the cause is either
+(A) the camera never showed it, or (B) it is too shallow/thin/small to read at
+viewer height and standing distance. Opposite fixes. Take (A) alone and the
+builder crops tighter, the crop "proves" it, and the object stays wrong in the
+game. Precedent from this batch: two arch-ring orders built at 0.08 m and
+0.18 m proud on a 13.3 m arch existed in geometry and rendered as one flat
+face. `B3-r5.md` therefore forces an explicit (A)/(B) call per item, recorded
+with reasoning in the manifest, and requires BOTH the wide frame where the
+feature must read AND the crop that counts it.
+
+**Three-round rule, discovered on the gaslamp vent.** Absent (r2) → shallow
+steps (r3) → proud ribs still reading as a decorative cap (r4). Three rounds on
+one feature means the APPROACH is wrong, not the execution. r5 stops adding
+ribs to a solid cap: a vent is a HOLE, cut through into a hollow interior so
+each gap shows dark void behind it (dark but still evidenced, never pure black).
+
+**B1 trajectory: r3 min 3 → r4 min 2 → r5 min 2 → r6 IN FLIGHT (`builder-B1-r6`).**
+r5 scores: sacks 2, stall 3, market 4, barrel 4, crate 4.
+**Rounds 2-5 were aimed at the wrong layer.** The r5 judge independently
+confirmed BOTH four-round targets finally cleared — the stall rope tie reads as
+rope (3 differing loops, depth crossing, knotted tail) and the sack neck is no
+longer faceted or spiked. The batch still scored 2 because the sack BODIES read
+as "smooth, continuous, worm-like blobs" (dough / larvae / a curled animal), with
+no cloth-fold behaviour except the ground-contact scallops. The neck was never
+why a stranger fails to say "sack". `B1-r6.md` rebuilds the BODY MASS and
+forbids touching the tie. This is why the operator stop-condition did NOT fire:
+the two features did not fail a fifth time, they passed, and a different and
+more fundamental defect surfaced underneath them.
+Also in r6: the stall canvas awning reads as a rigid moulded panel (needs 4+
+catenary sags, hemmed edge, 3+ grommets), and `stall_detail.png` is a FAILED
+RENDER — cropped so tight that the leg-crossing joint it exists to show is not
+in it. Market's Tier-1 clerestory/cresting/gutter gap is OPTIONAL and last:
+never destabilise a passing asset to chase fidelity.
+
+**Two parent-level lessons, both from defects no judge could have caught:**
+1. **Diff tri counts against budget every round.** sacks.glb shipped at 8,500
+   against an 8,000 prop budget through r3 and r4 and no judge flagged it,
+   because judges see renders and not counts. Now 7,956. Watch item: gaslamp
+   dropped 5,728 → 4,644 in r4 while GAINING a collar, braces and mullions —
+   r5 must report what was simplified to pay for that.
+2. **Clean provenance never means correct content.** stall_34/stall_detail were
+   provenance-clean from 19:37 while containing up to 9,985 true-black pixels
+   from a real formula bug (`COUNTER_H*0.42` put the trestle peg 0.158 m off the
+   true leg crossing at z=0.22, leaving the seam open). mtime checks prove
+   freshness, nothing more.
 
 **WIP state measured at resume (precise mtimes, 2026-08-31 PT):**
 - B1 stall: blend 19:37:06 → renders 19:37:12–40 → glb 19:37:41. CLEAN.

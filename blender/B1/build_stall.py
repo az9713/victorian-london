@@ -300,9 +300,11 @@ def build_canopy(bm):
 
     # n_steps includes the 3 interior support x's as exact grid rows (so the
     # sag genuinely returns to zero exactly AT each support, and the
-    # grommet buttons below land exactly on the ridge) -- 4 sheet segments
-    # per cell, 16 total, back to the original passing budget's resolution.
-    n_steps = 16
+    # grommet buttons below land exactly on the ridge). Divisible by 4 so
+    # the support x's land on EXISTING grid rows (no extra rows from the
+    # union below) -- 3 sheet segments per cell, the tightest that still
+    # keeps within the 8,000-tri budget once the hem/grommets are added.
+    n_steps = 12
     grid_t = sorted(set([i / n_steps for i in range(n_steps + 1)] +
                          [i / (N_SUPPORTS - 1) for i in range(N_SUPPORTS)]))
     dip = 0.09
