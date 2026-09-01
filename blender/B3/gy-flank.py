@@ -108,8 +108,21 @@ C.add_quad(bm, (-HALF_W, HEIGHT, -HALF_L), (FACE_X, HEIGHT, -HALF_L),
 #      lower hinge and threshold behind a wall of brick, invisible from any
 #      exterior camera. Gapped at the door bays with `banded_run`, same
 #      fix pattern as `flat_band` already uses for the wall face itself.
+# round-5 fixlist item 1a (cause B, decided against the geometry not the
+# render): r4's plinth was 0.08 m proud total -- at cam_face/_ctx's
+# standing distance that throws a shadow only ~1 px tall (proud x
+# tan(sun elevation)), which is exactly the judge's "thin white band", not
+# a countable weathered course. Rebuilt as a genuine TWO-TIER plinth: a
+# deep lower course (0.20 m proud, to knee height) plus the existing
+# shallower sloped upper course above it -- the step between the two
+# tiers is a real proud-to-proud drop, so it throws its own shadow edge in
+# the WIDE frame, not only in a crop.
+PLINTH_LOWER_Y0, PLINTH_LOWER_Y1 = 0.0, 0.22
+PLINTH_LOWER_PROUD = 0.20
+banded_run(PLINTH_LOWER_Y0, PLINTH_LOWER_Y1, FACE_X, FACE_X + PLINTH_LOWER_PROUD,
+           door_spans, gap_pad=0.08)
 PLINTH_SLOPE = 0.10
-banded_run(0.0, PLINTH_Y - PLINTH_SLOPE, FACE_X, FACE_X + 0.08, door_spans, gap_pad=0.08)
+banded_run(PLINTH_LOWER_Y1, PLINTH_Y - PLINTH_SLOPE, FACE_X, FACE_X + 0.08, door_spans, gap_pad=0.08)
 cursor = -HALF_L
 for (a, b) in [(x - 0.08, y + 0.08) for (x, y) in door_spans]:
     if a > cursor:
@@ -126,24 +139,57 @@ if cursor < HALF_L:
 #      length at mid-height (round-4 fixlist item 1b) -- sits in the plain
 #      band between the door heads and the window sills, so it never
 #      overlaps an opening (no door/window gap needed at this height).
-COURSE_Y0, COURSE_Y1 = 6.00, 6.14
-C.add_box(bm, FACE_X, FACE_X + 0.045, COURSE_Y0, COURSE_Y1, -HALF_L, HALF_L, mat_idx=BRICK)
+# round-5 fixlist item 1a (cause B): r4's coursing was 0.045 m proud x
+# 0.14 m tall -- "registers as one faint line" per the judge, because a
+# projection that shallow casts a shadow band only ~1 px tall at standing
+# distance no matter how the camera is framed. Rebuilt as a real two-part
+# brick band: a deep proud course plus a further-projecting cap lip
+# stepping out below it, so the step itself (not just an edge highlight)
+# reads the wall length in the wide frame.
+COURSE_Y0, COURSE_Y1 = 5.95, 6.25
+COURSE_PROUD = 0.16
+LIP_Y0, LIP_Y1 = 5.95, 6.05
+LIP_PROUD = 0.24
+C.add_box(bm, FACE_X, FACE_X + COURSE_PROUD, COURSE_Y0, COURSE_Y1, -HALF_L, HALF_L, mat_idx=BRICK)
+C.add_box(bm, FACE_X + COURSE_PROUD, FACE_X + LIP_PROUD, LIP_Y0, LIP_Y1, -HALF_L, HALF_L, mat_idx=BRICK)
 
 # ---- downpipes: two runs (round-4 fixlist item 1b asks for "at least one
 #      more" beyond zero -- two gives real headroom against the 15k/60k tri
 #      budget), each held off the wall by 2 wall brackets and kicking out to
 #      a shoe at the ground that discharges clear of the plinth.
-PIPE_R = 0.035
+# round-5 fixlist item 1b (partly cause A, partly cause B, per the fixlist's
+# own split): a 7 cm pipe is genuinely sub-pixel at cam_ctx's wide distance
+# (framing/cause A), but the fixlist also names the real-world pipe as too
+# thin at 7 cm and missing its hopper (cause B). Both fixed: PIPE_R widened
+# 0.035 -> 0.055 (11 cm dia, a real 1880s cast-iron downpipe), and a proper
+# hopper head added where the gutter outlet feeds into the pipe -- the part
+# a stranger actually looks for first, not the shaft.
+PIPE_R = 0.055
 PIPE_GAP = 0.05                       # standoff from the wall face
 PIPE_X = FACE_X + PIPE_GAP + PIPE_R
-PIPE_TOP = HEIGHT - 0.4
+# BUG FOUND round-5 (caught before render, not after): PIPE_TOP was
+# HEIGHT-0.4=11.6, and the hopper mouth built on top of it (11.6..11.9)
+# landed INSIDE the parapet coping's own y-range (COPE_Y0..COPE_Y1 =
+# 11.65..12.0) and x-range -- a genuine volumetric intersection, not a
+# framing choice, which is exactly why the hopper never showed up as its
+# own distinct shape in gy-flank_pipe.png (it rendered fused into the
+# coping). Dropped well clear of the coping so the hopper reads as a real
+# separate part below the eaves, the way an actual gutter outlet sits.
+PIPE_TOP = HEIGHT - 1.4
 PIPE_Z_RUNS = [-26.0, 26.0]           # clear of every door/window recess,
                                        # and close enough to the wall's
                                        # centre to land inside cam_ctx
 
 
 def build_downpipe(pz):
-    C.add_cylinder(bm, PIPE_X, pz, 0.35, PIPE_TOP, PIPE_R, segments=10, mat_idx=IRON)
+    # shaft: NOT capped at the top (cap_top=False) -- the hopper box built
+    # immediately above it, starting at the exact same y=PIPE_TOP plane,
+    # is what closes the pipe off. Capping both would leave two coincident
+    # faces in the same plane (the same z-fighting/light-trap bug class
+    # flagged throughout this batch); leaving the shaft open lets the
+    # hopper's own solid floor be the only face there.
+    C.add_cylinder(bm, PIPE_X, pz, 0.35, PIPE_TOP, PIPE_R, segments=10, mat_idx=IRON,
+                    cap_top=False)
     # wall brackets: proud collars fixing the pipe to the face at three
     # heights -- 1.0 and 2.6 sit close enough together to both land inside
     # one close-up crop (cam_pipe) alongside the ground shoe, so 2+
@@ -157,6 +203,15 @@ def build_downpipe(pz):
                     radius_top=PIPE_R)
     C.add_box(bm, FACE_X + PIPE_GAP - 0.02, PIPE_X + PIPE_R * 1.4, 0.0, 0.10,
               pz - PIPE_R * 1.4, pz + PIPE_R * 1.4, mat_idx=IRON)
+    # hopper head: a real wider box mounted flush to the wall exactly where
+    # the shaft's own (uncapped) top plane sits -- a necked lower box
+    # widening to a flared upper mouth, two disjoint y-ranges touching only
+    # at their shared plane (no volumetric overlap with each other or with
+    # the shaft, which stops at the same y=PIPE_TOP).
+    C.add_box(bm, FACE_X, FACE_X + 0.16, PIPE_TOP, PIPE_TOP + 0.10,
+              pz - 0.10, pz + 0.10, mat_idx=IRON)
+    C.add_box(bm, FACE_X, FACE_X + 0.24, PIPE_TOP + 0.10, PIPE_TOP + 0.30,
+              pz - 0.16, pz + 0.16, mat_idx=IRON)
 
 
 for pz in PIPE_Z_RUNS:
@@ -399,7 +454,14 @@ eye = 1.6
 # round-4: pulled back further and retargeted higher (y 1.3 -> 4.0) so the
 # coursing break (y 6.0-6.14) and the sloped plinth both land in frame
 # together with the door, not just the door alone.
-cam_face = C.add_camera("cam_face", C.V(14.0, eye, 14), C.V(4, 4.0, 14), lens=32)
+# round-5 fixlist item 1a/1c: the r4 frame's vertical FOV at target y=4.0
+# only spanned roughly y=1.2..6.8 -- the coursing landed, but the ground
+# and the whole two-tier PLINTH sat below the bottom edge, unevidenced in
+# the very frame the fixlist requires it in. Retargeted lower (mid-height
+# between the ground and the coursing top) and widened the lens so both
+# ends of the wall's readable band -- plinth at the foot, coursing above
+# the door heads -- land in the SAME wide frame together with the door.
+cam_face = C.add_camera("cam_face", C.V(14.0, eye, 14), C.V(4, 3.1, 14), lens=24)
 # _34 round-3 refit: pixel-checked the r3 render -- values were ~189/255,
 # NOT clipped white. The apparent "white-out" was a framing problem: the
 # target height (4.5m) sits in the middle of the LARGEST deliberately blank
@@ -423,11 +485,22 @@ cam_window = C.add_camera("cam_window", C.V(7.0, 9.325, -28.0), C.V(4, 9.325, -2
 # round-4: pulled back and widened so both downpipe runs (z +-26), the
 # coursing break, and the plinth all land in one wide elevation shot.
 cam_ctx = C.add_camera("cam_ctx", C.V(34, 8, 0), C.V(0, 6, 0), lens=18)
-# round-4 fixlist item 1b: at cam_ctx's wide scale a 7 cm downpipe is under
-# a pixel wide -- unevidenced even though it's geometrically present. A
-# dedicated close crop on one run (both wall brackets + the shoe at the
-# ground) makes it actually countable.
-cam_pipe = C.add_camera("cam_pipe", C.V(9.0, 1.45, 26.6), C.V(4.0, 1.45, 26.0), lens=35)
+# round-5 fixlist item 1b: the run now spans ground (shoe) to PIPE_TOP+0.30
+# (hopper mouth), ~12 m of wall height -- pulled well back and re-centred
+# so ONE frame contains the hopper, both brackets, the full shaft, and the
+# shoe discharging at the ground, per the fixlist's explicit instruction.
+# This sets the 1.6 m eye-height convention aside for this one dedicated
+# crop (same precedent as viaduct-module's cam_face, noted honestly in the
+# manifest) because a full-height downpipe run cannot be centred at eye
+# height and still show its own top and bottom in the same shot.
+# round-5 second pass: at the standard 960x540 landscape framing wide
+# enough to fit the whole run, the 0.11 m pipe and its brackets collapsed
+# to a hairline a couple of px wide -- present, but not honestly countable.
+# Rendered in a PORTRAIT aspect instead (960 tall x 540 wide, swapped just
+# for this one shot and restored after) so the same vertical extent is
+# covered by nearly twice the vertical pixels, closer in, without cropping
+# out the hopper or the shoe.
+cam_pipe = C.add_camera("cam_pipe", C.V(16.0, 5.5, 26.6), C.V(4.0, 5.5, 26.0), lens=24)
 
 C.setup_render('CYCLES', samples=32, res=(960, 540), device='CPU')
 # round-4: a handful of pixels deep in the door leaf's plank-gap crevices
@@ -452,9 +525,17 @@ for _hz, _hy in ((14.0, 1.925), (14.0, 0.225)):
 
 backup = C.apply_clay_override([obj])
 for cam, name in ((cam_face, "face"), (cam_34, "34"), (cam_detail, "detail"),
-                   (cam_window, "window"), (cam_ctx, "ctx"), (cam_pipe, "pipe")):
+                   (cam_window, "window"), (cam_ctx, "ctx")):
     bpy.context.scene.camera = cam
     C.render_to(C.RENDER_DIR + f"/gy-flank_{name}.png")
+# cam_pipe: portrait override, swapped back to landscape immediately after
+# so nothing later in the batch inherits it (this script only renders this
+# one asset, but keeping the swap scoped is the honest habit).
+scene = bpy.context.scene
+scene.render.resolution_x, scene.render.resolution_y = 540, 960
+bpy.context.scene.camera = cam_pipe
+C.render_to(C.RENDER_DIR + "/gy-flank_pipe.png")
+scene.render.resolution_x, scene.render.resolution_y = 960, 540
 C.restore_materials([obj], backup)
 
 print("DONE gy-flank")

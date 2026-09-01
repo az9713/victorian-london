@@ -238,18 +238,39 @@ def window_zface(face_z, sign, xc, y_sill, y_lintel, width=1.1, recess=WALL_THIC
         C.add_quad(bm, (xl + 0.02, y_sill + 0.02, back_bz), (xr - 0.02, y_sill + 0.02, back_bz),
                    (xr - 0.02, y_lintel - 0.02, back_bz), (xl + 0.02, y_lintel - 0.02, back_bz),
                    mat_idx=PAINT_DARK)
-        n_planks = 4
-        gap = 0.03
+        # round-5 fixlist item 4b (cause B): r4's boards were a uniform,
+        # evenly-staggered set -- "reads as generic shutter/panelling",
+        # not salvaged timber. Varied board heights (a fixed, unequal
+        # weight per board -- boards salvaged from elsewhere are never a
+        # matched set) plus a distinct stagger per board on each end
+        # separately (not a single symmetric offset), and 2 proud nail
+        # heads per board end (4 per board) that poke out on both faces of
+        # the plank so they read regardless of viewing side.
+        n_planks = 5
+        gap = 0.025
         py_lo, py_hi = y_sill + 0.04, y_lintel - 0.04
-        plank_h = (py_hi - py_lo - gap * (n_planks - 1)) / n_planks
+        avail = py_hi - py_lo - gap * (n_planks - 1)
+        weights = [0.85, 1.30, 0.70, 1.35, 0.80]
+        wsum = sum(weights)
+        heights = [avail * w / wsum for w in weights]
+        left_stagger = [0.022, -0.010, 0.030, 0.004, -0.016]
+        right_stagger = [-0.008, 0.018, -0.014, 0.026, 0.006]
         pz0 = rz - sign * 0.02
         pz1 = rz - sign * 0.055
+        zlo, zhi = min(pz0, pz1), max(pz0, pz1)
+        py0 = py_lo
         for k in range(n_planks):
-            py0 = py_lo + k * (plank_h + gap)
-            py1 = py0 + plank_h
-            stagger = 0.015 if k % 2 == 0 else 0.0  # rough, hand-nailed look
-            C.add_box(bm, xl + 0.02 - stagger, xr - 0.02 + stagger, py0, py1,
-                      min(pz0, pz1), max(pz0, pz1), mat_idx=PLANKS)
+            py1 = py0 + heights[k]
+            C.add_box(bm, xl + 0.02 - left_stagger[k], xr - 0.02 + right_stagger[k], py0, py1,
+                      zlo, zhi, mat_idx=PLANKS)
+            # nail heads: 2 per end (4 total per board), proud on both z
+            # faces so they read from whichever side the camera catches
+            ny_mid = (py0 + py1) / 2
+            for side_x in (xl + 0.07, xr - 0.07):
+                for dy in (-min(0.03, heights[k] * 0.3), min(0.03, heights[k] * 0.3)):
+                    C.add_box(bm, side_x - 0.012, side_x + 0.012, ny_mid + dy - 0.010, ny_mid + dy + 0.010,
+                              zlo - 0.006, zhi + 0.006, mat_idx=PAINT_DARK)
+            py0 = py1 + gap
     else:
         C.add_quad(bm, (xl, y_sill, rz), (xr, y_sill, rz), (xr, y_lintel, rz),
                    (xl, y_lintel, rz), mat_idx=PAINT_DARK)  # dark glazing recess
@@ -541,15 +562,26 @@ C.add_box(bm, PRIVY_X0 - 0.07, PRIVY_X0 - 0.03, latch_y - 0.025, latch_y + 0.025
           DOOR_Z1 - 0.14, DOOR_Z1 - 0.03, mat_idx=PAINT_DARK)
 
 # ---- standpipe against the court wall ----
+# round-5 fixlist item 4a (cause B): r4's shaft (0.045 m radius, 9 cm dia)
+# and cross-handle (0.05 m thick) read as "a near-invisible thin stick" at
+# rookery_yard.png's standing distance -- too thin to register, not a
+# framing problem. Thickened the shaft to a real standpipe diameter and
+# the handle to a diameter a hand could actually close around.
 SP_X, SP_Z = COURT_WALL_X0 - 0.05, FRONT_Z1 + 2.4
-C.add_cylinder(bm, SP_X, SP_Z, 0.0, 1.1, 0.045, segments=10, mat_idx=PAINT_DARK)
-C.add_box(bm, SP_X - 0.06, SP_X + 0.02, 1.02, 1.10, SP_Z - 0.05, SP_Z + 0.20, mat_idx=PAINT_DARK)  # spout
+C.add_cylinder(bm, SP_X, SP_Z, 0.0, 1.1, 0.065, segments=10, mat_idx=PAINT_DARK)
+C.add_box(bm, SP_X - 0.08, SP_X + 0.02, 1.02, 1.10, SP_Z - 0.06, SP_Z + 0.24, mat_idx=PAINT_DARK)  # spout
 # round-4 fixlist item 2d: a 0.06 m stub cylinder reads as a nub, not
 # something a hand could turn. A valve collar plus a horizontal cross-
 # handle a person could actually grip, with real thickness.
-C.add_cylinder(bm, SP_X, SP_Z, 1.10, 1.16, 0.055, segments=10, mat_idx=PAINT_DARK)  # valve collar
-C.add_box(bm, SP_X - 0.16, SP_X + 0.16, 1.155, 1.19, SP_Z - 0.025, SP_Z + 0.025, mat_idx=PAINT_DARK)  # cross-handle
-C.add_box(bm, SP_X - 0.03, SP_X + 0.03, 1.155, 1.19, SP_Z - 0.16, SP_Z + 0.16, mat_idx=PAINT_DARK)  # crossbar, other axis
+# round-5 zero-black fix: the collar's rounded top rim, after the bevel
+# modifier, pokes past a bare 0.01 m gap to the handle box above it,
+# leaving a thin self-shadowed crevice at the seam (7 pure-black px in
+# rookery_standpipe.png). Extending the collar up INTO the handle box's
+# own y-range (full solid embedding, not a touching gap) buries the round
+# rim inside the box's flat underside instead of leaving it exposed.
+C.add_cylinder(bm, SP_X, SP_Z, 1.10, 1.21, 0.085, segments=10, mat_idx=PAINT_DARK)  # valve collar
+C.add_box(bm, SP_X - 0.18, SP_X + 0.18, 1.19, 1.25, SP_Z - 0.04, SP_Z + 0.04, mat_idx=PAINT_DARK)  # cross-handle
+C.add_box(bm, SP_X - 0.04, SP_X + 0.04, 1.19, 1.25, SP_Z - 0.18, SP_Z + 0.18, mat_idx=PAINT_DARK)  # crossbar, other axis
 C.add_box(bm, SP_X - 0.10, SP_X + 0.10, 0.0, 0.08, SP_Z - 0.10, SP_Z + 0.10, mat_idx=BRICK)  # base pad
 # wall bracket fixing the standpipe
 C.add_box(bm, COURT_WALL_X0 - 0.08, SP_X + 0.02, 0.55, 0.62, SP_Z - 0.03, SP_Z + 0.03,
@@ -621,13 +653,19 @@ win_y_lintel = 3.5 + FLOOR_H * 0.78
 win_y_mid = (win_y_sill + win_y_lintel) / 2
 cam_window = C.add_camera("cam_window", C.V(win_xc - 1.0, win_y_mid, FRONT_Z0 - 3.5),
                            C.V(win_xc, win_y_mid, FRONT_Z0), lens=55)
+# round-5 fixlist item 4a: dedicated standpipe close-up -- at rookery_yard's
+# scale the thickened shaft/handle are better but still small in a wide
+# shot; a close crop is what actually makes the cross-handle's real
+# thickness (now grippable-diameter) countable.
+cam_standpipe = C.add_camera("cam_standpipe", C.V(SP_X - 1.6, 0.85, SP_Z - 0.5),
+                              C.V(SP_X, 0.85, SP_Z), lens=42)
 
 C.setup_render('CYCLES', samples=32, res=(960, 540), device='CPU')
 
 backup = C.apply_clay_override([obj])
 for cam, name in ((cam_face, "face"), (cam_34, "34"), (cam_detail, "detail"),
                    (cam_ctx, "ctx"), (cam_boarded, "boarded"), (cam_yard, "yard"),
-                   (cam_window, "window")):
+                   (cam_window, "window"), (cam_standpipe, "standpipe")):
     bpy.context.scene.camera = cam
     C.render_to(C.RENDER_DIR + f"/rookery_{name}.png")
 C.restore_materials([obj], backup)

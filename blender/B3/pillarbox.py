@@ -149,6 +149,16 @@ C.smart_uv(obj)
 bpy.context.view_layer.objects.active = obj
 obj.select_set(True)
 
+# round-5 provenance fix: this file used to save the .blend LAST, after
+# export and render -- every other B3 script saves BEFORE export/render so
+# the blend's mtime is provably the earliest of the three. Pillarbox was
+# the one file in the batch that didn't, which meant its delivered renders
+# did NOT postdate its .blend (a hard-rule violation caught while
+# re-running this round). Moved the save up here, matching the batch's own
+# established pattern.
+bpy.ops.wm.save_as_mainfile(
+    filepath="C:/Users/USERNAME/Downloads/projects/victorian-london/blender/B3/pillarbox.blend")
+
 # ---- exports ----
 C.export_glb([obj], C.MODELS_DIR + "/pillarbox.glb")
 
@@ -159,10 +169,13 @@ C.add_fill_light(loc=(1.2, -2.0, 1.8), energy=40)
 eye = 1.6
 cam_face = C.add_camera("cam_face", C.V(0.0, eye, 3.3), C.V(0, 0.68, 0), lens=40)
 cam_34 = C.add_camera("cam_34", C.V(2.1, eye, 2.7), C.V(0, 0.68, 0), lens=40)
-# door hinge (left edge, ~x=-0.20,z=0.19,y=0.47) and posting slot hood
-# (~x=0,z=0.26,y=0.86-0.94) together in one crop -- the two features that
-# answer "how do you post a letter" and "how does the postman open it"
-cam_detail = C.add_camera("cam_detail", C.V(0.02, 0.52, 0.85), C.V(-0.18, 0.52, 0.05), lens=32)
+# round-5 fixlist item 5 (optional, done -- cheap): r4's crop was "an
+# extreme close-up of two flat panels and a hinge sliver, showing nothing
+# the other frames do not." Re-aimed at the posting slot hood (~y=0.86-
+# 0.94) and the lock plate + keyhole (~y=0.42-0.50) together -- the two
+# features that answer "how do you post a letter" and "how does the
+# postman unlock it", which the door hinge alone didn't add over cam_34.
+cam_detail = C.add_camera("cam_detail", C.V(0.34, 0.62, 1.15), C.V(0.0, 0.62, 0.0), lens=32)
 
 C.setup_render('CYCLES', samples=32, res=(960, 540), device='CPU')
 
@@ -172,6 +185,4 @@ for cam, name in ((cam_face, "face"), (cam_34, "34"), (cam_detail, "detail")):
     C.render_to(C.RENDER_DIR + f"/pillarbox_{name}.png")
 C.restore_materials([obj], backup)
 
-bpy.ops.wm.save_as_mainfile(
-    filepath="C:/Users/USERNAME/Downloads/projects/victorian-london/blender/B3/pillarbox.blend")
 print("DONE pillarbox")
