@@ -42,10 +42,19 @@ quotes, or a judge loop that will not converge.
   The assembled game passes the 15/15 gate with current assets (48 fps median).
 
 ## ⏸ PAUSED by the operator 2026-08-31 19:40 PT — resume here
-the operator paused the pipeline to switch the SESSION model to Sonnet (7% Fable
-left until a reset >2 days out). Both running builders were TaskStop'd at
-19:38; their WIP is committed (117c7b3). NO agents are running. On resume,
-spawn subagents plain (no model override needed once the session is Sonnet).
+the operator paused the pipeline to change the session model (Fable was at 7% with
+a reset >2 days out). **Session model is now Opus 5** (set 19:45 PT via
+/model opus, saved as the default for new sessions). Both running builders
+were TaskStop'd at 19:38; their WIP is committed (117c7b3). NO agents are
+running.
+
+**Model rule on resume:** keep spawning builders and judges with
+`model: sonnet` explicitly — Sonnet has done every 2a round competently and
+this keeps the expensive session model for orchestration only. Do NOT let
+subagents inherit Opus 5 by default. Exception, and only if the operator approves:
+B1's last two features (stall tie, sack neck) have failed 4 rounds on
+Sonnet, so a single stronger-model builder on those two small features is
+the sanctioned escalation if r5 fails again.
 
 **Loop mechanics (unchanged):** builder gets BRIEF-COMMON.md + batch brief +
 fixlist verbatim; on "done" the parent runs `node scripts/glb_inventory.mjs`,
