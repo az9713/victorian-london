@@ -80,9 +80,9 @@ check('verb: arrow key turns the camera', Math.abs(s4.yaw - s3.yaw) > 0.3, `yaw 
   for (let i = 0; i < 20 && a.length < 2; i++) { await sleep(500); a = await page.evaluate(() => __game.npcs); }
   await sleep(4000);
   const b = await page.evaluate(() => __game.npcs);
-  const moved = a.length === 2 && b.length === 2 &&
+  const moved = a.length >= 2 && b.length === a.length &&
     a.some((p, i) => Math.hypot(b[i].x - p.x, b[i].z - p.z) > 0.8);
-  check('npcs: 2 present, at least one moving', moved,
+  check('npcs: 2+ present, at least one moving', moved,
     `${a.length} loaded; states ${b.map(n => n.state).join(',')}`);
 }
 

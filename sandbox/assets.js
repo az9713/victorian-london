@@ -54,8 +54,10 @@ export async function upgradeWorld({ THREE, GLTFLoader, scene, L, kindMeshes }) 
     t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
   // tints multiply the map: stone lifts toward weathered Portland (Christ Church
   // is Portland ashlar, not tan plaster); brick pulls toward sooty London stock
-  // hero.jpg palette: London stock brick is desaturated YELLOW-brown, not red
-  const MAT_TINT = { stone: 0xd6d2c8, brick: 0xb09c80 };
+  // research §5: a decade of soot turns stock brick "dark brown-black" and
+  // Portland ashlar soot-grey — the night grade, not the day hero.jpg palette
+  // 0x5a4a3a rendered walls black under the night skyglow; 0x7a6a58 keeps the soot read
+  const MAT_TINT = { stone: 0x9a948a, brick: 0x7a6a58 };
   for (const [name, slug] of Object.entries(MAT_PBR)) {
     const set = pbrManifest[slug]; if (!set) continue;
     shared[name] = new THREE.MeshStandardMaterial({
@@ -171,6 +173,7 @@ export async function upgradeWorld({ THREE, GLTFLoader, scene, L, kindMeshes }) 
       matG[k] = matG[k].clone(); matG[k].repeat.set(rx, rz); matG[k].needsUpdate = true;
     }
     gmesh.geometry.setAttribute('uv2', gmesh.geometry.attributes.uv);
+    matG.roughness = 0.35;   // research §5: damp cobbles carry a wet sheen; lamps reflect on the street
     gmesh.material = matG;
     report.placed.push('ground-cobbles');
   }
