@@ -48,8 +48,11 @@ BRIEF-COMMON.md + batch brief + its fixlist verbatim + the WIP resume state
 below. Orchestration only on Opus 5.
 
 ## ▶ SESSION 2026-09-01 (Opus 5): goal = finish stages 3-6 autonomously
-- **B3 r9 judge**: spawned fresh (`judge-B3-r9`, sonnet) per the resume block; prodded once
-  after idle-with-no-report. If silent again: respawn from the same prompt shape.
+- **B3 CLOSED — judge-B3-r9 PASSED the batch at 4** (gy-flank 4, viaduct 4, rookery 4,
+  pillarbox 5; gaslamp operator-closed). Tagged `2a-complete` (+ `2a-market-pass` at f3afb22).
+  STAGE 2 IS DONE. Two optional, non-blocking render-camera notes from the judge (game
+  cameras unaffected, skipped deliberately): cam_face clips the bricked doorway at frame
+  edge; cam_pipe still aims at the pipe's old z=26 (pipe now z=-20) so that crop shows no pipe.
 - **B4 REOPENED (r2)**: in-game lookdev found terrace modules' slate roof covers only the
   front strip — most of each 5x14 footprint is open sky from above. `builder-B4-r2` (sonnet)
   is extending roofs on all 6 modules. Countable gate: top-view render per module, zero sky
