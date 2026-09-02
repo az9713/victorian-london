@@ -1,0 +1,36 @@
+barrel.glb: 1 nodes, 1 meshes, 7492 tris, materials: [planks, iron]
+  nodes: barrel
+church.glb: 1 nodes, 1 meshes, 32790 tris, materials: [stone, slate, paint_dark, glass, iron]
+  nodes: church
+crate.glb: 1 nodes, 1 meshes, 4264 tris, materials: [planks, iron]
+  nodes: crate
+gaslamp.glb: 1 nodes, 1 meshes, 4480 tris, materials: [iron, glass]
+  nodes: gaslamp
+ginpalace.glb: 1 nodes, 1 meshes, 36532 tris, materials: [brick, paint_green, glass, slate, iron]
+  nodes: ginpalace
+gy-flank.glb: 1 nodes, 1 meshes, 37402 tris, materials: [brick, iron, planks]
+  nodes: gy_flank
+market.glb: 1 nodes, 1 meshes, 57804 tris, materials: [brick, iron, glass, slate, stone]
+  nodes: market
+pillarbox.glb: 1 nodes, 1 meshes, 5080 tris, materials: [postbox_red]
+  nodes: pillarbox
+rookery.glb: 1 nodes, 1 meshes, 49758 tris, materials: [brick, slate, paint_dark, planks]
+  nodes: rookery
+sacks.glb: 1 nodes, 1 meshes, 7756 tris, materials: [cloth]
+  nodes: sacks
+stall.glb: 1 nodes, 1 meshes, 7684 tris, materials: [planks, iron, plaster]
+  nodes: stall
+terrace0-3.glb: 1 nodes, 1 meshes, 7924 tris, materials: [brick, slate, planks, paint_green, paint_dark, iron]
+  nodes: terrace0-3
+terrace0-4.glb: 1 nodes, 1 meshes, 8696 tris, materials: [brick, slate, planks, paint_green, paint_dark, iron]
+  nodes: terrace0-4
+terrace1-3.glb: 1 nodes, 1 meshes, 7392 tris, materials: [brick, slate, planks, paint_dark, iron]
+  nodes: terrace1-3
+terrace1-4.glb: 1 nodes, 1 meshes, 8288 tris, materials: [brick, slate, planks, paint_dark, iron]
+  nodes: terrace1-4
+terrace2-3.glb: 1 nodes, 1 meshes, 6978 tris, materials: [brick, slate, planks, paint_dark, iron]
+  nodes: terrace2-3
+terrace2-4.glb: 1 nodes, 1 meshes, 7210 tris, materials: [brick, slate, planks, paint_dark, iron]
+  nodes: terrace2-4
+viaduct-module.glb: 1 nodes, 1 meshes, 15156 tris, materials: [brick, stone]
+  nodes: viaduct_module

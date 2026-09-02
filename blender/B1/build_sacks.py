@@ -155,15 +155,52 @@ def _tangent_frame(centers, i, Lx, Ly, Wx, Wy):
     return local_u, local_v
 
 
+def lump_offset(t, ang, lumps):
+    """Sum of a few low-frequency, irregular radial bumps (t-window x
+    angle-window gaussians), each with its own centre/amplitude/width so no
+    two are alike. Used ONLY on the CONTENTS collision body (round 8) -- the
+    r7 body was a smooth rounded-box, so gravity + self-collision buckled it
+    with rotational-symmetry-by-construction: an evenly-spaced fan converging
+    on one point. A lumpy (not smooth) mass underneath breaks that symmetry
+    so the cloth actually bunches unevenly, mid-body, diagonally."""
+    total = 0.0
+    for (ct, ca_, amp, st, sa_) in lumps:
+        dt = t - ct
+        da = (ang - ca_ + math.pi) % (2 * math.pi) - math.pi
+        total += amp * math.exp(-(dt / st) ** 2) * math.exp(-(da / sa_) ** 2)
+    return total
+
+
+def make_lumps(rnd, n=3, amp_lo=0.20, amp_hi=0.40):
+    lumps = []
+    for _ in range(n):
+        ct = rnd.uniform(0.18, 0.82)
+        ca_ = rnd.uniform(0.0, 2 * math.pi)
+        # r8 2nd pass: sacks_face.png/sacks_34.png at the first pass (3-4
+        # lumps, amp 0.10-0.24*HALF_W) read as clearly lumpy/creased at
+        # sacks_detail.png range but only marginally at the wide face/34
+        # range -- raising amplitude and lump count so the same bulges read
+        # at viewer distance, not just up close.
+        amp = rnd.uniform(amp_lo, amp_hi) * HALF_W  # irregular per lump, no two equal
+        st = rnd.uniform(0.09, 0.17)
+        sa_ = rnd.uniform(0.8, 1.7)
+        lumps.append((ct, ca_, amp, st, sa_))
+    return lumps
+
+
 def build_envelope(bm, cx, cy, s, body_deg, tail_z0, n_ring_body, n_ring_neck,
                     collar_n, seg, scale=1.0, t_end=None, flatten_bottom=1.0,
-                    jitter=0.0, seed=0):
+                    jitter=0.0, seed=0, lumps=None, mid_body_boost=1.0):
     """Plain (no folds/dents/puckers) quad-tube loft, used both for the cloth
     ENVELOPE (scale=1.0, t_end=None -> full body+neck) and the CONTENTS
     collision body (scale=CONTENT_SCALE, t_end=SHOULDER_T -> body only,
     capped at the shoulder, no neck). Returns (verts_by_ring, ts, pin_start_i)
     -- pin_start_i is the first ring index at t>=PIN_T, or None if t_end
-    stops before PIN_T (the contents body)."""
+    stops before PIN_T (the contents body).
+    `lumps`: round-8, CONTENTS body only -- see lump_offset(). `mid_body_boost`:
+    round-8, ENVELOPE only -- extra per-vertex jitter weighted to peak across
+    the mid-body (t~0.5) and taper toward the tail cap and shoulder, so fold
+    amplitude rises away from the neck (which must stay unchanged/passing)."""
     rad = math.radians(body_deg)
     Lx, Ly = math.cos(rad), math.sin(rad)
     Wx, Wy = -Ly, Lx
@@ -218,6 +255,15 @@ def build_envelope(bm, cx, cy, s, body_deg, tail_z0, n_ring_body, n_ring_neck,
             local_w = width_r * s * wscale
             local_h = hr * s
             pos = ring_center + local_u * (local_w * ca) + local_v * (local_h * sa)
+            # r8: CONTENTS-only -- irregular low-frequency bumps under the
+            # cloth so it doesn't drape onto a perfectly smooth, rotationally
+            # symmetric mass (see lump_offset()'s docstring for why that
+            # mattered).
+            if lumps and t < PIN_T:
+                dirv = local_u * ca + local_v * sa
+                if dirv.length > 1e-9:
+                    dirv.normalize()
+                    pos = pos + dirv * (lump_offset(t, a, lumps) * s)
             # r7: a perfectly rotationally-symmetric rest mesh collapses onto
             # its (also symmetric) contents by uniform radial compression,
             # with no buckling instability to seed a fold anywhere -- the
@@ -225,9 +271,18 @@ def build_envelope(bm, cx, cy, s, body_deg, tail_z0, n_ring_body, n_ring_neck,
             # jitter on the free cloth region (not the pinned neck) breaks
             # that symmetry so gravity + self-collision actually buckle the
             # excess fabric into creases instead of shrink-wrapping it.
+            # r8: ENVELOPE-only -- weight that jitter to peak across the
+            # MID-BODY (t~0.5) and taper toward the tail cap (t~0) and the
+            # shoulder (t~PIN_T), per the fixlist's "raise amplitude across
+            # the mid-body panels, not the neck". mid_body_boost=1.0 for the
+            # CONTENTS call (t_end<=SHOULDER_T, lumps handle it there instead).
             if jitter > 0.0 and t < PIN_T:
-                pos = pos + local_u * rnd.uniform(-jitter, jitter) * s \
-                          + local_v * rnd.uniform(-jitter, jitter) * s
+                mid_w = 1.0
+                if mid_body_boost != 1.0:
+                    tri = max(0.0, 1.0 - abs((t / PIN_T) - 0.5) / 0.5)  # 0..1..0
+                    mid_w = 0.4 + (mid_body_boost - 0.4) * tri
+                pos = pos + local_u * rnd.uniform(-jitter * mid_w, jitter * mid_w) * s \
+                          + local_v * rnd.uniform(-jitter * mid_w, jitter * mid_w) * s
             ring_verts.append(bm.verts.new((pos.x, pos.y, pos.z)))
         rings.append(ring_verts)
 
@@ -237,7 +292,19 @@ def build_envelope(bm, cx, cy, s, body_deg, tail_z0, n_ring_body, n_ring_neck,
             k2 = (k + 1) % seg
             bm.faces.new((r0[k], r0[k2], r1[k2], r1[k]))
 
-    tail_center = bm.verts.new((cx, cy, tail_z0))
+    tail_pos = mathutils.Vector((cx, cy, tail_z0))
+    if jitter > 0.0:
+        # r8: the tail-cap fan (single centre vertex, `seg` triangles meeting
+        # at it) is perfectly radially symmetric BY CONSTRUCTION -- exactly
+        # the "evenly-spaced fan converging on one point" the fixlist calls
+        # out. Nudging the centre off-axis (ENVELOPE only) makes the fan's
+        # own triangles unequal lengths before the sim even starts, so any
+        # crease that forms there is no longer perfectly even-spaced.
+        tail_u, tail_v = _tangent_frame(centers, 0, Lx, Ly, Wx, Wy)
+        off_u, off_v = rnd.uniform(-1, 1), rnd.uniform(-1, 1)
+        tail_pos = tail_pos + tail_u * (off_u * 0.05 * HALF_W * s) \
+                             + tail_v * (off_v * 0.05 * HALF_W * s)
+    tail_center = bm.verts.new((tail_pos.x, tail_pos.y, tail_pos.z))
     for k in range(seg):
         k2 = (k + 1) % seg
         bm.faces.new((tail_center, rings[0][k2], rings[0][k]))
@@ -268,23 +335,29 @@ def add_collision(obj, thickness=0.003, damping=0.5):
 
 
 def sim_sack(cx, cy, s, body_deg, tail_z0, n_ring_body, n_ring_neck, collar_n,
-             seg, extra_colliders, sack_tag, jitter_seed=0):
+             seg, extra_colliders, sack_tag, jitter_seed=0, lump_n_range=(5, 6),
+             lump_amp_range=(0.20, 0.40)):
     """Build one sack's contents + cloth envelope, sim it against
     extra_colliders (previously baked sacks + ground), step the solver,
     snapshot the deformed mesh, verify the pin, and return the FINAL baked
     object (contents + temp cloth object are deleted before returning)."""
     scene = bpy.context.scene
 
+    lump_rnd = random.Random(jitter_seed * 101 + 7)
+    lumps = make_lumps(lump_rnd, n=lump_rnd.randint(*lump_n_range),
+                        amp_lo=lump_amp_range[0], amp_hi=lump_amp_range[1])
+
     bm_c = bmesh.new()
     build_envelope(bm_c, cx, cy, s, body_deg, tail_z0, n_ring_body, n_ring_neck,
-                   collar_n, seg, scale=CONTENT_SCALE, t_end=SHOULDER_T, flatten_bottom=0.75)
+                   collar_n, seg, scale=CONTENT_SCALE, t_end=SHOULDER_T, flatten_bottom=0.75,
+                   lumps=lumps)
     contents_obj = make_object(f"{sack_tag}_contents", bm_c)
     add_collision(contents_obj, thickness=0.003, damping=0.6)
 
     bm_e = bmesh.new()
     rings, ts, pin_start_i = build_envelope(
         bm_e, cx, cy, s, body_deg, tail_z0, n_ring_body, n_ring_neck, collar_n, seg,
-        scale=ENVELOPE_SCALE, t_end=None, jitter=0.006, seed=jitter_seed)
+        scale=ENVELOPE_SCALE, t_end=None, jitter=0.009, seed=jitter_seed, mid_body_boost=2.6)
     env_obj = make_object(f"{sack_tag}_cloth", bm_e)
     env_obj.data.materials.append(get_shared_material("cloth"))
 
@@ -313,10 +386,15 @@ def sim_sack(cx, cy, s, body_deg, tail_z0, n_ring_body, n_ring_neck, collar_n,
     # produces creases): keep tension high, drop compression an order of
     # magnitude, and rely on gravity + slack (0.72 content scale) + self
     # collision for folds instead of an outward pressure force.
+    # r8: compression dropped further (5 -> 2.5) per the fixlist -- tension
+    # stays high (jute doesn't stretch) but the cloth must buckle even more
+    # readily under its own excess material now that the mid-body jitter and
+    # the lumpy contents (see make_lumps()) are actively seeding asymmetric
+    # instabilities instead of a uniform one.
     cs.tension_stiffness = 25
-    cs.compression_stiffness = 5
+    cs.compression_stiffness = 2.5
     cs.shear_stiffness = 6
-    cs.bending_stiffness = 2.5
+    cs.bending_stiffness = 1.8
     cs.tension_damping = 5
     cs.compression_damping = 5
     cs.shear_damping = 5
@@ -371,20 +449,33 @@ def build():
     ground = add_ground_plane(size=4.0)
     add_collision(ground, thickness=0.003, damping=0.8)
 
-    baked1 = sim_sack(c1[0], c1[1], s1, 18, tail1, n_ring_body=22, n_ring_neck=13,
-                       collar_n=3, seg=N_SEG, extra_colliders=[ground], sack_tag="sack1",
-                       jitter_seed=1)
+    # r8: resolution raised across all three sacks (22->30 body rings / 32->38
+    # segments for sack1, 16->22 body rings / 24->28 segments for sacks 2-3).
+    # sacks.glb was landing at 5,088 tris against an 8,000 budget WITHOUT the
+    # decimate step ever firing (pre-decimate tri_count was already <=7500) --
+    # the mesh was simply born low-poly, so the fix is more geometry here, not
+    # a gentler decimate ratio. Target ~7,700-7,900 tris joined, measured and
+    # iterated against the actual exported GLB, not this comment.
+    # r8 3rd pass: sack1 (the nearest sack in sacks_face.png) read as a
+    # borderline ~5 shadowed creases at the standard 5-6 lumps -- sack2/3
+    # (smaller scale, same params) read stronger. Sack1-ONLY: more lumps (7-8)
+    # with the amplitude FLOOR raised (0.24-0.40, not the ceiling) so there
+    # are more countable transitions without pushing individual bumps toward
+    # the round-2 "boulder/rock" failure mode. Sacks 2/3 unchanged.
+    baked1 = sim_sack(c1[0], c1[1], s1, 18, tail1, n_ring_body=30, n_ring_neck=15,
+                       collar_n=3, seg=38, extra_colliders=[ground], sack_tag="sack1",
+                       jitter_seed=1, lump_n_range=(7, 8), lump_amp_range=(0.24, 0.40))
     add_collision(baked1, thickness=0.003, damping=0.6)
 
-    baked2 = sim_sack(c2[0], c2[1], s2, -70, tail2, n_ring_body=16, n_ring_neck=8,
-                       collar_n=2, seg=24, extra_colliders=[ground, baked1], sack_tag="sack2",
+    baked2 = sim_sack(c2[0], c2[1], s2, -70, tail2, n_ring_body=22, n_ring_neck=11,
+                       collar_n=2, seg=28, extra_colliders=[ground, baked1], sack_tag="sack2",
                        jitter_seed=2)
     add_collision(baked2, thickness=0.003, damping=0.6)
 
     c3x = (c1[0] + c2[0]) / 2.0 + 0.02
     c3y = (c1[1] + c2[1]) / 2.0 - 0.01
-    baked3 = sim_sack(c3x, c3y, s3, 100, tail3, n_ring_body=16, n_ring_neck=8,
-                       collar_n=2, seg=24, extra_colliders=[ground, baked1, baked2],
+    baked3 = sim_sack(c3x, c3y, s3, 100, tail3, n_ring_body=22, n_ring_neck=11,
+                       collar_n=2, seg=28, extra_colliders=[ground, baked1, baked2],
                        sack_tag="sack3", jitter_seed=3)
 
     # strip collision proxies now that all three are baked
@@ -411,10 +502,14 @@ def build():
 
     tri_count = sum(len(p.vertices) - 2 for p in sacks_obj.data.polygons)
     print(f"joined sacks pre-decimate tris: {tri_count}")
-    if tri_count > 7500:
+    # r8: raised from 7,500 to 7,900 -- this is now a safety clamp only (the
+    # raised ring/segment counts above are what's meant to land near budget);
+    # if the sim mesh is already under 7,900 this block simply does not fire,
+    # same as it silently didn't fire last round at 5,088.
+    if tri_count > 7900:
         dec = sacks_obj.modifiers.new("Decimate", 'DECIMATE')
         dec.decimate_type = 'COLLAPSE'
-        dec.ratio = 7500.0 / max(tri_count, 1)
+        dec.ratio = 7900.0 / max(tri_count, 1)
         bpy.context.view_layer.objects.active = sacks_obj
         bpy.ops.object.modifier_apply(modifier="Decimate")
         tri_count = sum(len(p.vertices) - 2 for p in sacks_obj.data.polygons)
