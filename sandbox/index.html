@@ -449,7 +449,9 @@ function tick(now){
         oy=Math.max(0.4, ty-Math.sin(P.pitch)*cd)-ty,
         oz=Math.cos(P.yaw)*Math.cos(P.pitch)*cd;
   const t = occludeT(tx,ty,tz, ox,oy,oz);
-  const k = Math.max(0.12, t*0.95);           // stop just in front of the wall
+  // stop just in front of the wall; the wall margin must beat the comfort floor,
+  // or a player backed against a wall puts the camera THROUGH it (seen in-game)
+  const k = Math.max(0.03, Math.min(t*0.95, t-0.02));
   gameplayCamera.position.set(tx+ox*k, ty+oy*k, tz+oz*k);
   gameplayCamera.lookAt(tx,ty,tz);
   const cam = (FAULT==='cam') ? debugCamera : gameplayCamera;   // 'cam' fault: stolen view

@@ -11,9 +11,31 @@ const MAT_PBR = {
   brick: 'brown_brick_02', slate: 'roof_slates_02', cobble: 'cobblestone_03',
   planks: 'dark_wooden_planks', plaster: 'beige_wall_001', stone: 'beige_wall_001',
 };
+
+// Texel density. The builders UV with smart_project, which packs EVERY object's
+// islands into the 0-1 square — so one texture tile stretches across a whole
+// 20 m facade and brick reads metres-per-brick. UV area 1 therefore maps to the
+// object's entire surface area A, so repeat = sqrt(A) / metres-per-tile restores
+// real-world texel size. Density is uniform across an object (one pack for all
+// its islands), so ONE repeat per object is correct for all its materials.
+const triAreaOf = geom => {          // local-space surface area, cached on the geometry
+  if (geom.__area != null) return geom.__area;
+  const p = geom.attributes.position, idx = geom.index;
+  const n = idx ? idx.count : p.count, gi = i => (idx ? idx.getX(i) : i);
+  let a = 0;
+  for (let i = 0; i + 2 < n; i += 3) {
+    const i0 = gi(i), i1 = gi(i + 1), i2 = gi(i + 2);
+    const ax = p.getX(i1) - p.getX(i0), ay = p.getY(i1) - p.getY(i0), az = p.getZ(i1) - p.getZ(i0);
+    const bx = p.getX(i2) - p.getX(i0), by = p.getY(i2) - p.getY(i0), bz = p.getZ(i2) - p.getZ(i0);
+    a += 0.5 * Math.hypot(ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx);
+  }
+  return (geom.__area = a);
+};
 const MAT_FLAT = {   // color/rough/metal for non-textured names
   iron:        { color: 0x2a2c2e, roughness: 0.55, metalness: 0.85 },
-  glass:       { color: 0x9fb4c0, roughness: 0.08, metalness: 0.0, transparent: true, opacity: 0.35 },
+  // near-opaque sooty glazing: windows read as dark Victorian glass instead of
+  // see-through holes into hollow module interiors
+  glass:       { color: 0x1c232a, roughness: 0.12, metalness: 0.0, transparent: true, opacity: 0.88 },
   paint_dark:  { color: 0x25321f, roughness: 0.6 },
   paint_green: { color: 0x2e4a34, roughness: 0.55 },
   postbox_red: { color: 0x8a1c1c, roughness: 0.5 },
@@ -30,10 +52,15 @@ export async function upgradeWorld({ THREE, GLTFLoader, scene, L, kindMeshes }) 
   const shared = {};
   const loadTex = (p, srgb) => { const t = tl.load('assets/pbr/' + p);
     t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
+  // tints multiply the map: stone lifts toward weathered Portland (Christ Church
+  // is Portland ashlar, not tan plaster); brick pulls toward sooty London stock
+  // hero.jpg palette: London stock brick is desaturated YELLOW-brown, not red
+  const MAT_TINT = { stone: 0xd6d2c8, brick: 0xb09c80 };
   for (const [name, slug] of Object.entries(MAT_PBR)) {
     const set = pbrManifest[slug]; if (!set) continue;
     shared[name] = new THREE.MeshStandardMaterial({
       name, map: set.maps.diff && loadTex(set.maps.diff, true),
+      color: MAT_TINT[name] ?? 0xffffff,
       normalMap: set.maps.normal && loadTex(set.maps.normal),
       roughnessMap: set.maps.rough && loadTex(set.maps.rough),
       aoMap: set.maps.ao && loadTex(set.maps.ao),
@@ -42,9 +69,36 @@ export async function upgradeWorld({ THREE, GLTFLoader, scene, L, kindMeshes }) 
   for (const [name, def] of Object.entries(MAT_FLAT))
     shared[name] = new THREE.MeshStandardMaterial({ name, ...def });
 
-  const bindMaterials = root => root.traverse(o => {
+  // metres covered by one texture tile, per bound material name
+  const MAT_TILE = {};
+  for (const [name, slug] of Object.entries(MAT_PBR))
+    MAT_TILE[name] = pbrManifest[slug]?.scale ?? 2;
+
+  // repeat-corrected variants, cached so instanced terraces share materials
+  const tiled = {};
+  const atRepeat = (name, r) => {
+    const base = shared[name];
+    if (!base?.map || !MAT_TILE[name]) return base;      // flat colours need no repeat
+    const key = `${name}|${r.toFixed(2)}`;
+    if (tiled[key]) return tiled[key];
+    const m = base.clone();
+    for (const k of ['map', 'normalMap', 'roughnessMap', 'aoMap']) {
+      if (!m[k]) continue;
+      m[k] = m[k].clone(); m[k].repeat.set(r, r); m[k].needsUpdate = true;
+    }
+    return (tiled[key] = m);
+  };
+
+  const bindMaterials = (root, scaleY = 1) => root.traverse(o => {
     if (!o.isMesh) return;
-    const swap = m => shared[m.name?.toLowerCase().replace(/\.\d+$/, '')] ?? m;
+    // ponytail: non-uniform scale.y folded in as a linear area factor, not exact
+    // per-triangle. Terraces stretch 11.25->14 m at most, so the error is <5%.
+    const area = triAreaOf(o.geometry) * scaleY;
+    const repeatFor = name => Math.max(1, Math.sqrt(area) / (MAT_TILE[name] ?? 2));
+    const swap = m => {
+      const name = m.name?.toLowerCase().replace(/\.\d+$/, '');
+      return shared[name] ? atRepeat(name, repeatFor(name)) : m;
+    };
     o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);
     if (o.geometry.attributes.uv && !o.geometry.attributes.uv2)
       o.geometry.setAttribute('uv2', o.geometry.attributes.uv);   // aoMap needs uv2
@@ -61,7 +115,7 @@ export async function upgradeWorld({ THREE, GLTFLoader, scene, L, kindMeshes }) 
     const inst = glb.scene.clone(true);
     inst.position.set(x, 0, z); inst.rotation.y = rotY;
     if (scaleY !== 1) inst.scale.y = scaleY;
-    bindMaterials(inst); scene.add(inst); return inst;
+    bindMaterials(inst, scaleY); scene.add(inst); return inst;
   };
 
   // ---- landmark placements (origins per the builder briefs) ----

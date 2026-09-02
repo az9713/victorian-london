@@ -1,0 +1,60 @@
+<!doctype html>
+<!-- GLB inspector: /verify/inspect.html?m=terrace1-4&a=back  (a: front|back|top|three4) -->
+<html><body style="margin:0">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+ "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const q = new URLSearchParams(location.search);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x808890);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(3, 6, 2); scene.add(sun);
+const cam = new THREE.PerspectiveCamera(50, 16/9, 0.1, 500);
+const r = new THREE.WebGLRenderer({ antialias: true });
+r.setSize(1280, 720); document.body.appendChild(r.domElement);
+new GLTFLoader().load(`../assets/models/${q.get('m') ?? 'terrace1-4'}.glb`, g => {
+  const root = g.scene;
+  root.traverse(o => { if (o.isMesh) {   // clay: geometry only, no material tricks
+    o.userData.mats = (Array.isArray(o.material) ? o.material : [o.material]).map(m => m.name);
+    o.material = new THREE.MeshStandardMaterial({ color: 0xb8b2a8, roughness: 0.9 }); } });
+  scene.add(root);
+  const bb = new THREE.Box3().setFromObject(root), c = bb.getCenter(new THREE.Vector3()),
+        s = bb.getSize(new THREE.Vector3()), d = Math.max(s.x, s.y, s.z) * 1.4;
+  const A = {
+    front:  [c.x, c.y, bb.min.z - d],
+    back:   [c.x, c.y, bb.max.z + d],
+    top:    [c.x + 0.01, bb.max.y + d, c.z],
+    three4: [bb.max.x + d * 0.7, c.y + d * 0.5, bb.min.z - d * 0.7],
+  }[q.get('a') ?? 'three4'];
+  cam.position.set(...A); cam.lookAt(c);
+  r.render(scene, cam);
+  // geometry facts for the driver: per-mesh uv presence, area, material names
+  window.__info = [];
+  root.traverse(o => { if (!o.isMesh) return;
+    const p = o.geometry.attributes.position, idx = o.geometry.index;
+    const n = idx ? idx.count : p.count, gi = i => (idx ? idx.getX(i) : i);
+    let area = 0;
+    for (let i = 0; i + 2 < n; i += 3) {
+      const i0 = gi(i), i1 = gi(i + 1), i2 = gi(i + 2);
+      const ax = p.getX(i1) - p.getX(i0), ay = p.getY(i1) - p.getY(i0), az = p.getZ(i1) - p.getZ(i0);
+      const bx = p.getX(i2) - p.getX(i0), by = p.getY(i2) - p.getY(i0), bz = p.getZ(i2) - p.getZ(i0);
+      area += 0.5 * Math.hypot(ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx);
+    }
+    const uv = o.geometry.attributes.uv;
+    let uvMin = [1e9, 1e9], uvMax = [-1e9, -1e9];
+    if (uv) for (let i = 0; i < uv.count; i++) {
+      uvMin = [Math.min(uvMin[0], uv.getX(i)), Math.min(uvMin[1], uv.getY(i))];
+      uvMax = [Math.max(uvMax[0], uv.getX(i)), Math.max(uvMax[1], uv.getY(i))];
+    }
+    const mats = o.userData.mats;
+    window.__info.push({ name: o.name, tris: n / 3, area: +area.toFixed(1),
+      hasUV: !!uv, uvMin, uvMax, mats,
+      groups: o.geometry.groups?.length ?? 0 });
+  });
+  window.__shot = true;
+});
+</script></body></html>
