@@ -64,15 +64,19 @@ export async function upgradeWorld({ THREE, GLTFLoader, scene, L, kindMeshes }) 
       normalMap: set.maps.normal && loadTex(set.maps.normal),
       roughnessMap: set.maps.rough && loadTex(set.maps.rough),
       aoMap: set.maps.ao && loadTex(set.maps.ao),
+      side: THREE.DoubleSide,   // builder walls are single-sided; the player walks both sides
     });
   }
   for (const [name, def] of Object.entries(MAT_FLAT))
-    shared[name] = new THREE.MeshStandardMaterial({ name, ...def });
+    shared[name] = new THREE.MeshStandardMaterial({ name, side: THREE.DoubleSide, ...def });
 
   // metres covered by one texture tile, per bound material name
   const MAT_TILE = {};
   for (const [name, slug] of Object.entries(MAT_PBR))
     MAT_TILE[name] = pbrManifest[slug]?.scale ?? 2;
+  // brown_brick_02 at its declared 2 m holds ~9 courses -> 22 cm bricks, ~2.5x
+  // life size. 1.2 m/tile puts courses at ~13 cm without obvious tiling repeats.
+  MAT_TILE.brick = 1.2;
 
   // repeat-corrected variants, cached so instanced terraces share materials
   const tiled = {};
