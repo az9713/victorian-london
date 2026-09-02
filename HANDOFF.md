@@ -47,6 +47,14 @@ Pipeline restarted after the pause. Fresh builders `builder-B1-r5b` and
 BRIEF-COMMON.md + batch brief + its fixlist verbatim + the WIP resume state
 below. Orchestration only on Opus 5.
 
+## ✅ ALL SIX STAGES COMPLETE — SHIPPED 2026-09-02, tag `ship-v1`
+Stage 3 `stage3-assembly-pass` (assembly judge r2 PASS at 4; gate 15/15 + 3 red-tests).
+Stage 4 `stage4-atmosphere` (smog grade to hero.jpg, ambience bed, gate 15/15).
+Stage 5 `stage5-feel-pass` (NPC soft body + FOV kick measured in feel.mjs, mission
+replay w/ best time, gate 16/16). Stage 6: perf datum idle 72.5/69.4, play
+144.9/70.4 @ true 1280x720 dpr1 ANGLE D3D11 iGPU; HANDOVER.md written.
+Read HANDOVER.md first from now on; the session block below is history.
+
 ## ▶ SESSION 2026-09-01 (Opus 5): goal = finish stages 3-6 autonomously
 - **B3 CLOSED — judge-B3-r9 PASSED the batch at 4** (gy-flank 4, viaduct 4, rookery 4,
   pillarbox 5; gaslamp operator-closed). Tagged `2a-complete` (+ `2a-market-pass` at f3afb22).
