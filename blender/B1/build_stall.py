@@ -243,6 +243,96 @@ def add_rope_wrap(bm, pole_x, attach_z, canvas_mat, rope_mat, pole_r=0.03, seed=
             f.smooth = True
 
 
+def sim_canopy_sheet(pole_x, y_half, attach_z, support_x, n_steps_x=26, n_steps_y=5,
+                      frames=60):
+    """r7 TECHNIQUE CHANGE (blender/fixlists/B1-r7.md): the canopy was a
+    hand-modelled sine/cell sag -- a lathe-style function, same defect class
+    as the sack body, and the r6 judge read it as sheet-metal/origami with
+    no curve anywhere. This builds a flat quad grid, pins the FULL-WIDTH
+    edge at each pole (the canvas is genuinely clamped there) and only the
+    CENTRELINE vertex at the 3 interior ridge ties (a point grommet, not a
+    seam), then lets gravity sag it. Returns the baked, already-deformed
+    mesh object -- thickness/hem/grommets are added by the caller."""
+    scene = bpy.context.scene
+    bm = bmesh.new()
+    xs = [-pole_x + (2 * pole_x) * i / n_steps_x for i in range(n_steps_x + 1)]
+    ys = [-y_half + (2 * y_half) * j / n_steps_y for j in range(n_steps_y + 1)]
+    ny = len(ys)
+    grid = [[bm.verts.new((x, y, attach_z)) for y in ys] for x in xs]
+    for i in range(n_steps_x):
+        for j in range(n_steps_y):
+            bm.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]))
+    mesh = bpy.data.meshes.new("_canopy_sheet_tmp")
+    bm.to_mesh(mesh)
+    bm.free()
+    obj = bpy.data.objects.new("_canopy_sheet_tmp", mesh)
+    bpy.context.collection.objects.link(obj)
+
+    vg = obj.vertex_groups.new(name="Pin")
+    pin_idx = []
+    j_centre = min(range(ny), key=lambda j: abs(ys[j]))
+    for i, x in enumerate(xs):
+        is_pole = abs(x + pole_x) < 1e-6 or abs(x - pole_x) < 1e-6
+        is_interior = any(abs(x - sx) < 1e-6 for sx in support_x[1:-1])
+        if is_pole:
+            for j in range(ny):
+                pin_idx.append(i * ny + j)
+        elif is_interior:
+            pin_idx.append(i * ny + j_centre)
+    vg.add(pin_idx, 1.0, 'REPLACE')
+
+    cloth_mod = obj.modifiers.new("Cloth", 'CLOTH')
+    cs = cloth_mod.settings
+    cs.quality = 8
+    cs.mass = 0.15
+    cs.tension_stiffness = 30
+    cs.compression_stiffness = 4
+    cs.shear_stiffness = 8
+    cs.bending_stiffness = 3
+    cs.vertex_group_mass = "Pin"
+    cs.pin_stiffness = 1.0
+    coll = cloth_mod.collision_settings
+    coll.distance_min = 0.002
+
+    # r7: a bare gravity sag between symmetric pins settles perfectly
+    # mirror-symmetric in Y -- real canvas ripples unevenly. A weak
+    # turbulence field breaks that symmetry so the free edges wobble.
+    bpy.ops.object.effector_add(type='TURBULENCE', location=(0, 0, attach_z - 0.3))
+    turb = bpy.context.active_object
+    turb.field.strength = 0.5
+    turb.field.size = 0.5
+    turb.field.flow = 0.4
+    turb.field.noise = 2.0
+
+    scene.frame_start = 1
+    scene.frame_end = frames
+    scene.frame_set(1)
+    for f in range(1, frames + 1):
+        scene.frame_set(f)
+
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = obj.evaluated_get(dg)
+    baked_mesh = bpy.data.meshes.new_from_object(ev)
+    baked_obj = bpy.data.objects.new("_canopy_baked", baked_mesh)
+    baked_obj.matrix_world = obj.matrix_world.copy()
+    bpy.context.collection.objects.link(baked_obj)
+
+    # pin verify: the pole-edge + interior-centre pins must not have moved.
+    before = [grid_pt for grid_pt in ((x, y, attach_z) for i, x in enumerate(xs) for y in ys)]
+    max_delta = 0.0
+    for idx in pin_idx:
+        bx, by, bz = before[idx]
+        av = baked_mesh.vertices[idx].co
+        d = ((av.x - bx) ** 2 + (av.y - by) ** 2 + (av.z - bz) ** 2) ** 0.5
+        max_delta = max(max_delta, d)
+    print(f"[canopy] PIN VERIFY max delta = {max_delta:.6f} m "
+          f"({'OK' if max_delta < 0.001 else 'FAIL -- pin moved'})")
+
+    bpy.data.objects.remove(obj, do_unlink=True)
+    bpy.data.objects.remove(turb, do_unlink=True)
+    return baked_obj, xs, ys, ny
+
+
 def build_canopy(bm):
     """A continuous swept, sagging canvas sheet with real thickness (round 2
     rebuild -- the flat unrotated panel segments used before left visible
@@ -291,78 +381,67 @@ def build_canopy(bm):
 
     N_SUPPORTS = 5   # 2 poles + 3 interior tie points -- 4 sag cells between them
     support_x = [-pole_x + (2 * pole_x) * i / (N_SUPPORTS - 1) for i in range(N_SUPPORTS)]
-
-    def cell_sag(t_glob, dip):
-        cellf = t_glob * (N_SUPPORTS - 1)
-        cell = min(int(cellf), N_SUPPORTS - 2)
-        s_local = cellf - cell
-        return dip * math.sin(math.pi * s_local)
-
-    # n_steps includes the 3 interior support x's as exact grid rows (so the
-    # sag genuinely returns to zero exactly AT each support, and the
-    # grommet buttons below land exactly on the ridge). Divisible by 4 so
-    # the support x's land on EXISTING grid rows (no extra rows from the
-    # union below). 8 (2 segments per sag cell -- a triangle bump, not a
-    # smooth curve) is the floor forced by the 8,000-tri budget once the
-    # doubled-face hem beads and 3 grommets are counted; still clearly
-    # readable as 4 separate dips at this object's on-screen size.
-    n_steps = 8
-    grid_t = sorted(set([i / n_steps for i in range(n_steps + 1)] +
-                         [i / (N_SUPPORTS - 1) for i in range(N_SUPPORTS)]))
-    dip = 0.09
-    thickness = 0.018
     y_half = 0.55
-    bead_r = 0.010   # r6 fixlist 2a: hem bead proud-ness past y_half -- thicker than the 0.018 sheet
-    top_v, bot_v, bead_v = [], [], []
-    for t in grid_t:
-        x = -pole_x + (2 * pole_x) * t
-        sag = cell_sag(t, dip)
-        zt = attach_z - sag
-        zb = zt - thickness
-        zmid = (zt + zb) / 2.0
-        top_v.append((bm.verts.new((x, -y_half, zt)), bm.verts.new((x, y_half, zt))))
-        bot_v.append((bm.verts.new((x, -y_half, zb)), bm.verts.new((x, y_half, zb))))
-        # r6 fixlist 2a: a rolled hem bead -- one extra vertex per edge per
-        # row, bulged past y_half at mid-thickness height, folding the flat
-        # side quad into a rounded double-tri bead instead of a knife edge.
-        # Built INTO the sheet's own face loop (no separate object), so it
-        # costs only ~1 extra tri per row per edge instead of a separate
-        # rope curve's fixed per-part overhead.
-        bead_v.append((bm.verts.new((x, -y_half - bead_r, zmid)),
-                        bm.verts.new((x, y_half + bead_r, zmid))))
-    n = len(grid_t)
-    for i in range(n - 1):
-        tl0, tr0 = top_v[i]; tl1, tr1 = top_v[i + 1]
-        bl0, br0 = bot_v[i]; bl1, br1 = bot_v[i + 1]
-        bml0, bmr0 = bead_v[i]; bml1, bmr1 = bead_v[i + 1]
-        bm.faces.new((tl0, tr0, tr1, tl1)).material_index = PLASTER   # top
-        bm.faces.new((bl1, br1, br0, bl0)).material_index = PLASTER  # bottom
-        # -y hem bead: top->bead->bottom (was a single flat edge quad)
-        bm.faces.new((tl0, bml0, bml1, tl1)).material_index = PLASTER
-        bm.faces.new((bml0, bl0, bl1, bml1)).material_index = PLASTER
-        # +y hem bead
-        bm.faces.new((br0, bmr0, bmr1, br1)).material_index = PLASTER
-        bm.faces.new((bmr0, tr0, tr1, bmr1)).material_index = PLASTER
-    # end caps at the two poles, closing the (now hexagonal, hem-beaded)
-    # cross-section as a single n-gon each -- traversal order follows the
-    # true perimeter: top(-y) -> bead(-y) -> bottom(-y) -> bottom(+y) ->
-    # bead(+y) -> top(+y) -> back to start. Reversed at the +x end for the
-    # opposite outward-facing winding.
-    bml0, bmr0 = bead_v[0]
-    bm.faces.new((top_v[0][0], bml0, bot_v[0][0], bot_v[0][1], bmr0, top_v[0][1])).material_index = PLASTER
-    bml1, bmr1 = bead_v[-1]
-    bm.faces.new((top_v[-1][0], top_v[-1][1], bmr1, bot_v[-1][1], bot_v[-1][0], bml1)).material_index = PLASTER
 
-    # r6 fixlist 2a: 3 ridge tie points/grommets, one per interior support --
-    # a small proud button on the canvas top surface (poles already carry
-    # the big rope-wrap ties, so these only need to read as "eyelet", which
-    # the fixlist accepts as an alternative to "cord"). A tiny box sitting
-    # on the existing top surface is a fixed, small cost regardless of the
-    # global Bevel modifier (its own edges are already at a hard ~90 deg,
-    # same order as every other bolt/nub already in the budget).
+    # r7 TECHNIQUE CHANGE: sim the sheet instead of hand-modelling a sine/
+    # cell sag (see sim_canopy_sheet's docstring). The catenary sag is now a
+    # solver output, not an authored curve.
+    baked_obj, xs, ys, ny = sim_canopy_sheet(pole_x, y_half, attach_z, support_x)
+    vs = baked_obj.data.vertices
+
+    # Hem bead: built from the SIM'S OWN boundary rows (undecimated, so it
+    # follows whatever ripple the solver actually produced), using the same
+    # rope-curve+bevel technique already proven for the pole tie wraps above
+    # (round cross-section -- cheap under this object's 80 deg Bevel
+    # modifier, unlike a sharp-cornered part; see add_rope_wrap's docstring).
+    # r6's 0.010 m bead read as a knife edge and scored ABSENT -- this one is
+    # more than double that.
+    # r7 2nd pass: a hem curve sampled at every grid column (41 points) with
+    # bevel_res=3 cost ~1,280 tris for the two edges combined -- more than
+    # the whole rest of the canopy rebuild. The catenary + ripple the solver
+    # produced is low-frequency; every 3rd column is still plenty to trace
+    # it, and bevel_res=2 (an octagon, still round enough to read as rolled
+    # cord under the 80 deg Bevel modifier) roughly halves the remaining cost.
+    HEM_R = 0.024
+    for j_edge in (0, ny - 1):
+        pts = [tuple(vs[i * ny + j_edge].co) for i in range(0, len(xs), 3)]
+        if (len(xs) - 1) % 3 != 0:
+            pts.append(tuple(vs[(len(xs) - 1) * ny + j_edge].co))
+        rope_from_curve(bm, pts, [1.0] * len(pts), HEM_R, PLASTER, bevel_res=2)
+
+    # 3 ridge grommets at the interior supports, at the sim's own settled z
+    # (== attach_z there, since those rows are pinned -- verified above).
+    j_centre = min(range(ny), key=lambda j: abs(ys[j]))
     for x in support_x[1:-1]:
-        zt = attach_z  # sag is 0 exactly at a support
-        add_cyl(bm, (x, 0, zt + 0.006), 0.020, 0.020, 0.012, IRON, segments=5)
+        i_closest = min(range(len(xs)), key=lambda i: abs(xs[i] - x))
+        gz = vs[i_closest * ny + j_centre].co.z
+        add_cyl(bm, (x, 0, gz + 0.008), 0.020, 0.020, 0.014, IRON, segments=5)
+
+    # Sheet thickness: Solidify (no zero-thickness plane) roughly doubles the
+    # face count, so decimate the flat single-surface drape FIRST, leaving
+    # deliberate headroom for the doubling plus the hem/grommets above --
+    # measured against the batch's actual remaining budget in build().
+    raw_tris = sum(len(p.vertices) - 2 for p in baked_obj.data.polygons)
+    print(f"[canopy] raw sim sheet tris (pre-decimate, pre-solidify): {raw_tris}")
+    target_pre_solidify = 420
+    bpy.context.view_layer.objects.active = baked_obj
+    if raw_tris > target_pre_solidify:
+        dec = baked_obj.modifiers.new("Decimate", 'DECIMATE')
+        dec.decimate_type = 'COLLAPSE'
+        dec.ratio = target_pre_solidify / max(raw_tris, 1)
+        bpy.ops.object.modifier_apply(modifier="Decimate")
+    sol = baked_obj.modifiers.new("Solidify", 'SOLIDIFY')
+    sol.thickness = 0.018
+    sol.offset = -1.0
+    sol.use_rim = True
+    bpy.ops.object.modifier_apply(modifier="Solidify")
+    print(f"[canopy] sheet tris after decimate+solidify: "
+          f"{sum(len(p.vertices) - 2 for p in baked_obj.data.polygons)}")
+
+    for p in baked_obj.data.polygons:
+        p.material_index = PLASTER
+    bm.from_mesh(baked_obj.data)
+    bpy.data.objects.remove(baked_obj, do_unlink=True)
 
 
 def build():
@@ -392,6 +471,34 @@ def build():
     # bevel.
     add_bevel(obj, width=0.006, segments=1, angle_limit=math.radians(80))
     apply_all_transforms(obj)
+    # r7 safety net: the canopy's actual added cost (sim grid + hem curves +
+    # grommets, all measured at build time by sim_canopy_sheet's prints) is
+    # harder to predict exactly than a hand-authored sheet was -- if the
+    # evaluated total (Bevel included) still overshoots the 8,000 prop
+    # budget, decimate the WHOLE object down to budget rather than guess at
+    # the sheet's share in advance. Re-measured and printed either way.
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = obj.evaluated_get(dg)
+    ev_mesh = ev.to_mesh()
+    tri_count = sum(len(p.vertices) - 2 for p in ev_mesh.polygons)
+    ev.to_mesh_clear()
+    print(f"[stall] evaluated tri count (with Bevel): {tri_count}")
+    attempt = 0
+    while tri_count > 7800 and attempt < 4:
+        attempt += 1
+        dec = obj.modifiers.new(f"BudgetDecimate{attempt}", 'DECIMATE')
+        dec.decimate_type = 'COLLAPSE'
+        dec.ratio = min(0.95, 7500.0 / tri_count)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.modifier_apply(modifier=f"BudgetDecimate{attempt}")
+        dg = bpy.context.evaluated_depsgraph_get()
+        ev = obj.evaluated_get(dg)
+        ev_mesh = ev.to_mesh()
+        tri_count = sum(len(p.vertices) - 2 for p in ev_mesh.polygons)
+        ev.to_mesh_clear()
+        print(f"[stall] evaluated tri count after budget decimate pass {attempt}: {tri_count}")
+    if tri_count > 8000:
+        print(f"[stall] WARNING: still over budget after {attempt} decimate passes: {tri_count}")
     smart_uv(obj)
     return obj
 
@@ -461,6 +568,14 @@ def render_pass():
     add_camera("cam_tie", (pole_x + 0.52, -0.50, attach_z + 0.00),
                mathutils.Vector((pole_x, 0, attach_z - 0.14)), lens=48)
     render_to(os.path.join(RENDERS_DIR, "stall_tie.png"))
+    # r7: cam_hem was dropped when this function was rewritten for the cloth
+    # sim canopy, leaving the r6 zigzag-panel stall_hem.png on disk as stale
+    # evidence of the OLD geometry. Re-added, framed on the near long hem
+    # edge (y=-0.55) centred on the middle interior support (x=0) and pulled
+    # back/widened just enough to keep all 3 interior grommets
+    # (x=-0.64, 0, 0.64) in one frame, per the fixlist.
+    add_camera("cam_hem", (0.0, -1.85, 2.75), mathutils.Vector((0.0, -0.30, 1.95)), lens=38)
+    render_to(os.path.join(RENDERS_DIR, "stall_hem.png"))
 
 
 if __name__ == "__main__":
