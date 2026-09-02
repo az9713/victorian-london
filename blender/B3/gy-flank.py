@@ -369,22 +369,25 @@ def build_door_leaf(z0, z1, y0, y1):
 
 
 def build_blocked_doorway(z0, z1, y0, y1):
-    """round-7 fixlist item 3: a former doorway blocked with brick set BACK
-    from the wall face, inside the original jambs/lintel that build_recess
-    already built for this opening -- the single clearest "how was this
-    altered" tell the fixlist asks for. The infill sits at BLOCK_SETBACK
-    (0.15 m) behind the wall face -- recessed from the original jamb line,
-    but well short of the recess's own full REVEAL depth (0.30 m) behind it,
-    so a stranger reads two distinct depths: the original opening's reveal,
-    then a shallower brick plug set into it later.
-    Kept 0.03 m clear of the recess's own back plane (at FACE_X-REVEAL) and
-    0.02 m clear of every jamb/lintel/sill quad build_recess already added at
-    this footprint -- exact coincident faces at the same plane are the
-    z-fighting/light-trap bug class this file has hit before (see the strap
-    hinge and threshold notes above)."""
-    BLOCK_SETBACK = 0.15
+    """round-7 fixlist item 3 (deepened, round-8): a former doorway blocked
+    with brick set BACK from the wall face, inside the original jambs/lintel
+    that build_recess already built for this opening.
+    round-8 fixlist item 1c: r7's BLOCK_SETBACK (0.15 m) was HALF the 0.30 m
+    reveal depth available, and at that shallow a setback the infill read as
+    just another small dark square, indistinguishable from a barred window
+    from a stranger's distance. Deepened so the visible reveal shadow (from
+    FACE_X to the infill's own front face) is now 0.23 m of the 0.30 m
+    available (77%, not 50%) -- the jamb walls stay lit far longer before the
+    eye hits the brick plug, which is the actual depth cue a stranger reads.
+    The plug's own front face sits 0.02 m clear of the recess's own back
+    plane (at FACE_X-REVEAL) and 0.02 m clear of every jamb/lintel/sill quad
+    build_recess already added at this footprint -- exact coincident faces at
+    the same plane are the z-fighting/light-trap bug class this file has hit
+    before (see the strap hinge and threshold notes above)."""
+    BLOCK_SETBACK = 0.23
+    INFILL_THICKNESS = 0.05
     infill_front = FACE_X - BLOCK_SETBACK
-    infill_back = (FACE_X - REVEAL) + 0.03
+    infill_back = infill_front - INFILL_THICKNESS
     C.add_box(bm, infill_back, infill_front, y0 + 0.02, y1 - 0.02,
               z0 + 0.02, z1 - 0.02, mat_idx=BRICK)
 
@@ -461,19 +464,65 @@ C.add_box(bm, FACE_X - 0.05, FACE_X + 0.10, COPE_Y0 - 0.05, COPE_Y0,
 # touched or removed.
 
 # -- feature 5 of 5 (boundary plate): a cast-iron parish/burial-ground
-#    boundary marker set into a brick surround -- the "sign of age or
+#    boundary marker mounted on the wall face -- the "sign of age or
 #    maintenance" the fixlist asks for, and the most explicitly LEGAL/
 #    administrative tell available for a graveyard wall (a real thing these
-#    walls carried). Chosen over a repair patch or rubbing course because it
-#    reads as a single unambiguous proud rectangle even in a wide frame,
-#    where a change-of-bond patch would need a close crop to register.
+#    walls carried).
+# round-8 fixlist item 2: r7's plate was 0.64 m wide x 0.80 m tall -- TALLER
+# than wide, the exact same portrait aspect ratio as a window (WIN_HW*2=
+# 0.84 wide x 1.05 tall), so shape alone gave a stranger nothing to tell them
+# apart, however different the surface contrast measured. Rebuilt with a
+# shape no window on this wall has:
+#   (a) markedly WIDER than tall (1.10 x 0.50, a 2.2:1 landscape rectangle,
+#       vs every window's ~0.8:1 portrait rectangle);
+#   (b) a genuinely MOULDED raised border, built as three stepped-out
+#       depths rather than one flat proud rectangle -- a thin backing pad
+#       (mounting base), a recessed plain field inside it, and a raised
+#       border frame proud of the field around the rim -- so the border
+#       itself casts a shadow onto the field, the tell a flat plate can't
+#       give;
+#   (c) mounted fully PROUD of the wall face at every depth (the backing pad
+#       is the SHALLOWEST layer, not a recess cut into the brick) -- unlike
+#       every opening on this wall, which sits back INTO the wall via
+#       build_recess. Proud-only construction is itself a silhouette
+#       difference from every window/door on the wall, all of which read as
+#       darker RECESSED squares; the plate reads as a lighter RAISED one.
+# Position (z=8.0, y=2.40-2.90) is unchanged from r7 -- already clear of the
+# door band (y 0-2.15) and the window band (y 8.8-9.85), so position alone
+# was never the problem; shape and mounting direction were.
 PLATE_Z = 8.0
-PLATE_Y0, PLATE_Y1 = 2.2, 3.0
-PLATE_HW = 0.32
-C.add_box(bm, FACE_X, FACE_X + 0.05, PLATE_Y0 - 0.06, PLATE_Y1 + 0.06,
-          PLATE_Z - PLATE_HW - 0.06, PLATE_Z + PLATE_HW + 0.06, mat_idx=BRICK)  # brick surround
-C.add_box(bm, FACE_X + 0.05, FACE_X + 0.09, PLATE_Y0, PLATE_Y1,
-          PLATE_Z - PLATE_HW, PLATE_Z + PLATE_HW, mat_idx=IRON)  # cast-iron plate, proud of its own surround
+PLATE_W, PLATE_H = 1.10, 0.50
+PLATE_HW = PLATE_W / 2
+PLATE_Y_MID = 2.65
+PLATE_Y0, PLATE_Y1 = PLATE_Y_MID - PLATE_H / 2, PLATE_Y_MID + PLATE_H / 2
+BORDER_T = 0.08          # width of the raised border frame strips
+BACK_MARGIN = 0.16       # backing pad's overhang beyond the border
+BACK_PROUD = 0.03        # mounting pad: shallowest layer, largest footprint
+FIELD_PROUD = 0.07       # plain field: proud of the pad, recessed under the border
+BORDER_PROUD = 0.12      # moulded border: proudest layer, casts a shadow onto the field
+
+# backing pad -- the mounting base, proud of the bare wall but the least
+# proud of the plate's own three layers, largest footprint (reads first as
+# "something is fixed to this wall here")
+C.add_box(bm, FACE_X, FACE_X + BACK_PROUD,
+          PLATE_Y0 - BORDER_T - BACK_MARGIN, PLATE_Y1 + BORDER_T + BACK_MARGIN,
+          PLATE_Z - PLATE_HW - BORDER_T - BACK_MARGIN, PLATE_Z + PLATE_HW + BORDER_T + BACK_MARGIN,
+          mat_idx=BRICK)
+# plain recessed field -- sits inside the border's rim, proud of the pad but
+# set back under the border's own raised lip
+C.add_box(bm, FACE_X, FACE_X + FIELD_PROUD, PLATE_Y0, PLATE_Y1,
+          PLATE_Z - PLATE_HW, PLATE_Z + PLATE_HW, mat_idx=IRON)
+# moulded raised border -- four strips framing the field, each proud beyond
+# the field's own face, so the border throws a shadow onto the field it
+# encloses (the moulding tell a flat proud rectangle cannot give)
+C.add_box(bm, FACE_X, FACE_X + BORDER_PROUD, PLATE_Y1, PLATE_Y1 + BORDER_T,
+          PLATE_Z - PLATE_HW - BORDER_T, PLATE_Z + PLATE_HW + BORDER_T, mat_idx=IRON)  # top
+C.add_box(bm, FACE_X, FACE_X + BORDER_PROUD, PLATE_Y0 - BORDER_T, PLATE_Y0,
+          PLATE_Z - PLATE_HW - BORDER_T, PLATE_Z + PLATE_HW + BORDER_T, mat_idx=IRON)  # bottom
+C.add_box(bm, FACE_X, FACE_X + BORDER_PROUD, PLATE_Y0, PLATE_Y1,
+          PLATE_Z - PLATE_HW - BORDER_T, PLATE_Z - PLATE_HW, mat_idx=IRON)  # left
+C.add_box(bm, FACE_X, FACE_X + BORDER_PROUD, PLATE_Y0, PLATE_Y1,
+          PLATE_Z + PLATE_HW, PLATE_Z + PLATE_HW + BORDER_T, mat_idx=IRON)  # right
 
 # -- feature 4 of 5 (gate piers): the door at z=14 is treated as the
 #    entrance -- a proper pair of piers, wider and proud further than the
@@ -741,6 +790,26 @@ cam_ctx = C.add_camera("cam_ctx", C.V(34, 8, 0), C.V(0, 6, 0), lens=18)
 # out the hopper or the shoe.
 cam_pipe = C.add_camera("cam_pipe", C.V(16.0, 5.5, 26.6), C.V(4.0, 5.5, 26.0), lens=24)
 
+# round-8 fixlist item 3: two NEW dedicated evidence crops -- neither the
+# bricked doorway nor the boundary plate had one before this round, which is
+# why the manifest's own contrast numbers were unevidenced to a stranger
+# looking at the actual image. Both centred on their subject (the gaslamp
+# vent's lesson this batch: detail pushed to the frame edges reads as "not
+# there" to a third reader even when the geometry is present).
+# cam_blocked: same recipe as cam_detail (the WORKING door's own evidence
+# crop) -- same standoff (5 m), same lens (32 mm), same eye-ish height
+# (1.1 m, centred on the blocked opening's own 0-2.31 m visible range
+# incl. lintel) -- so the two crops are directly comparable frame-for-frame:
+# a stranger can set cam_detail's real door leaf beside cam_blocked's brick
+# plug and see the same jamb/lintel shell around two different fills.
+cam_blocked = C.add_camera("cam_blocked", C.V(9.0, 1.1, 27.0), C.V(4.0, 1.1, 27.0), lens=32)
+# cam_plate: closer standoff (2.8 m) than cam_blocked because the plate's
+# own footprint (1.10 x 0.50 m field, 1.42 x 0.82 m incl. border and pad
+# margin) is smaller than a doorway -- sized so the plate fills the centre
+# of the frame with clear margin on all four sides (not pushed to an edge),
+# centred vertically on the field's own mid-height (y=2.65).
+cam_plate = C.add_camera("cam_plate", C.V(6.8, 2.65, 8.0), C.V(4.0, 2.65, 8.0), lens=35)
+
 C.setup_render('CYCLES', samples=32, res=(960, 540), device='CPU')
 # round-4: a handful of pixels deep in the door leaf's plank-gap crevices
 # sat just under the pure-black threshold. Raising the GLOBAL world ambient
@@ -764,7 +833,8 @@ for _hz, _hy in ((14.0, 1.925), (14.0, 0.225)):
 
 backup = C.apply_clay_override([obj])
 for cam, name in ((cam_face, "face"), (cam_walk, "walk"), (cam_34, "34"), (cam_detail, "detail"),
-                   (cam_window, "window"), (cam_ctx, "ctx")):
+                   (cam_window, "window"), (cam_ctx, "ctx"), (cam_blocked, "blocked"),
+                   (cam_plate, "plate")):
     bpy.context.scene.camera = cam
     C.render_to(C.RENDER_DIR + f"/gy-flank_{name}.png")
 # cam_pipe: portrait override, swapped back to landscape immediately after
