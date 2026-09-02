@@ -131,7 +131,8 @@ upgradeWorld({ THREE, GLTFLoader, scene, L, kindMeshes })
 const FAULT = new URLSearchParams(location.search).get('fault');
 if (FAULT==='seal') colliders.push({x1:284,z1:60,x2:296,z2:62});   // seals Brick Lane
 const debugCamera = gameplayCamera.clone(); debugCamera.name='debug';
-debugCamera.position.set(175,120,150); debugCamera.lookAt(175,0,150);
+debugCamera.position.set(175,290,150); debugCamera.lookAt(175,0,150);   // whole 350x300 slice
+if (FAULT==='cam') scene.fog = null;    // aerial evidence view; fog washes out 290 m
 
 // ---------- player: capsule collider + rigged costermonger visual (stage 2b) ----------
 const player = new THREE.Group();

@@ -16,14 +16,17 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // A TOUR in walk order from spawn (290,20). via = street waypoints (beelines wedge
 // into building pockets); stand/look chosen so each frame answers its `why`.
 const TOUR = [
-  ['viaduct',       { via: [[240, 21]],                        x: 175, z: 30,  yaw: 0,           pitch: 0.10, why: 'viaduct arches closing the north edge' }],
+  // viaduct: stand in the x140-160 terrace-row gap so the camera has clear air behind
+  ['viaduct',       { via: [[240, 21], [175, 21], [150, 30]],  x: 150, z: 42,  yaw: 0,           pitch: 0.15, why: 'viaduct arches closing the north edge' }],
   ['brick-lane',    { via: [[240, 21], [288, 30]],             x: 286, z: 120, yaw: Math.PI,     pitch: 0.15, why: 'roofline clutter down Brick Lane' }],
   ['market-pier',   { via: [[288, 150], [260, 150]],           x: 232, z: 150, yaw: Math.PI,     pitch: 0.05, why: 'brick texel size on the market piers' }],
   ['rookery',       { via: [[200, 150], [180, 150]],           x: 171, z: 152, yaw: Math.PI,     pitch: 0.20, why: 'rookery north front from Dorset St' }],
   ['terrace-brick', { via: [[160, 150]],                       x: 150, z: 156, yaw: Math.PI,     pitch: 0.10, why: 'the pocket south of George Yard mouth' }],
   ['gy-flank',      { via: [[150, 150], [150, 120]],           x: 150, z: 92,  yaw: 0,           pitch: 0.05, why: 'graveyard flank walls at walking distance' }],
   ['ginpalace',     { via: [[150, 150], [100, 150], [65, 150], [65, 185]], x: 70, z: 196, yaw: 0, pitch: 0.10, why: 'gin palace frontage' }],
-  ['church',        { via: [[60, 200]],                        x: 46,  z: 207, yaw: Math.PI / 2, pitch: 0.45, why: 'church + spire, west face' }],
+  // church: open street at x55-65, pitch high enough that the +50 m spire enters frame;
+  // standing further east puts the camera inside buildings or the character
+  ['church',        { via: [[65, 185], [60, 200]],             x: 55,  z: 207, yaw: Math.PI / 2, pitch: 1.0,  why: 'church + spire from Commercial St' }],
 ];
 
 const want = process.argv.slice(2).filter(a => !a.startsWith('-'));
