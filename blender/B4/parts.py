@@ -541,9 +541,37 @@ def roof_and_parapet(bm, wall_top, parapet_top, chimney_x, missing_coping=False,
     y_roof_front = wall_top + ridge_rise
     y_roof_back = wall_top
 
-    # sloped slate roof (single catslide pitch, front tucked behind parapet)
-    C.add_quad(bm, (x0, y_roof_front, z_roof_front), (x1, y_roof_front, z_roof_front),
-               (x1, y_roof_back, z_roof_back), (x0, y_roof_back, z_roof_back), mat_idx=SLATE)
+    # sloped slate roof (single catslide pitch, front tucked behind parapet).
+    # r2 fix: was a bare zero-thickness add_quad -- a single free-standing
+    # face with no matching backface, which a real-time (in-game) renderer
+    # backface-culls, so from directly overhead the module read as open
+    # sky/hollow interior even though Cycles clay renders looked fine. Now
+    # built as a solid wedge (top slate + offset soffit + 4 closing edges),
+    # vertex/face pattern mirrored from C.add_box's proven outward-normal
+    # convention -- gives the roof real thickness and a correctly-wound
+    # top face, per BRIEF-COMMON "no zero-thickness planes".
+    th = 0.14  # roof build-up thickness (slate + battens + felt), metres
+    v = [
+        bm.verts.new(C.V(x0, y_roof_front - th, z_roof_front)),
+        bm.verts.new(C.V(x1, y_roof_front - th, z_roof_front)),
+        bm.verts.new(C.V(x1, y_roof_back - th, z_roof_back)),
+        bm.verts.new(C.V(x0, y_roof_back - th, z_roof_back)),
+        bm.verts.new(C.V(x0, y_roof_front, z_roof_front)),
+        bm.verts.new(C.V(x1, y_roof_front, z_roof_front)),
+        bm.verts.new(C.V(x1, y_roof_back, z_roof_back)),
+        bm.verts.new(C.V(x0, y_roof_back, z_roof_back)),
+    ]
+    roof_faces = [
+        ((0, 1, 2, 3), PLANKS),   # soffit (underside, faces down)
+        ((7, 6, 5, 4), SLATE),    # top slate face (faces up -- the visible roof)
+        ((0, 4, 5, 1), SLATE),    # front tuck edge (thin, under the parapet)
+        ((1, 5, 6, 2), PLANKS),   # x1 gable-end edge (bargeboard)
+        ((2, 6, 7, 3), PLANKS),   # back eave edge (bargeboard, under fascia)
+        ((3, 7, 4, 0), PLANKS),   # x0 gable-end edge (bargeboard)
+    ]
+    for f_idx, mat in roof_faces:
+        face = bm.faces.new([v[i] for i in f_idx])
+        face.material_index = mat
     # gable-end infill triangles closing the roof volume, flush at x0/x1
     for xw in (x0, x1):
         C.add_tri(bm, (xw, wall_top, z_roof_front), (xw, y_roof_front, z_roof_front),

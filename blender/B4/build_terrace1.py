@@ -64,6 +64,44 @@ for obj, storeys, wall_top, parapet_top in objs:
 for o2, _, _, _ in objs:
     o2.hide_render = False
 
+# --- r2 fix: top-down + back-3/4 renders, to verify roof coverage ---
+scene = bpy.context.scene
+for obj, storeys, wall_top, parapet_top in objs:
+    for o2, _, _, _ in objs:
+        o2.hide_render = (o2 is not obj)
+
+    cam_top = C.add_camera("cam_top", C.V(0.0, 30.0, 0.0), C.V(0.0, 0.0, 0.0), lens=35)
+    cam_top.data.type = 'ORTHO'
+    cam_top.data.ortho_scale = 14.0
+
+    cam_back34 = C.add_camera(
+        "cam_back34", C.V(4.5, parapet_top + 4.0, P.Z_BACK + 8.0),
+        C.V(0.0, wall_top - 1.0, P.Z_BACK - 3.0), lens=32)
+
+    backup = C.apply_clay_override([obj])
+
+    prev_res = (scene.render.resolution_x, scene.render.resolution_y)
+    prev_transparent = scene.render.film_transparent
+    prev_color_mode = scene.render.image_settings.color_mode
+    scene.render.resolution_x, scene.render.resolution_y = 250, 700
+    scene.render.film_transparent = True
+    scene.render.image_settings.color_mode = 'RGBA'
+    scene.camera = cam_top
+    C.render_to(C.RENDER_DIR + f"/terrace1-{storeys}_top.png")
+    scene.render.resolution_x, scene.render.resolution_y = prev_res
+    scene.render.film_transparent = prev_transparent
+    scene.render.image_settings.color_mode = prev_color_mode
+
+    scene.camera = cam_back34
+    C.render_to(C.RENDER_DIR + f"/terrace1-{storeys}_back34.png")
+
+    C.restore_materials([obj], backup)
+    for cam in (cam_top, cam_back34):
+        bpy.data.objects.remove(cam, do_unlink=True)
+
+for o2, _, _, _ in objs:
+    o2.hide_render = False
+
 bpy.ops.wm.save_as_mainfile(
     filepath="C:/Users/USERNAME/Downloads/projects/victorian-london/blender/B4/terrace1.blend")
 print("DONE terrace1-3 / terrace1-4")
