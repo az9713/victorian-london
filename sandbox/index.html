@@ -212,6 +212,13 @@ spawnNPC('constable', 1.80,
 function npcTick(dt){
   for (const n of npcs){
     n.mixer.update(dt);
+    // soft body: walking through people feels broken — push the PLAYER out
+    const pdx = player.position.x - n.grp.position.x, pdz = player.position.z - n.grp.position.z;
+    const pd = Math.hypot(pdx, pdz);
+    if (pd > 1e-4 && pd < 0.7){
+      const push = (0.7 - pd);
+      player.position.x += pdx/pd * push; player.position.z += pdz/pd * push;
+    }
     if (n.state === 'idle'){
       n.wait -= dt;
       if (n.wait <= 0){ n.state='walk'; n.act.idle.crossFadeTo(n.act.walk.reset().play(), 0.3, false); }
@@ -344,7 +351,7 @@ const M_POINTS = [
   {x:41,  z:207, prompt:'E — deliver to the church',    hud:'deliver to the church (3/3)'},
   {x:234, z:150, prompt:'E — finish the round',         hud:'return to the market'},
 ];
-const mission = { idx:0, active:false, t0:null, tEnd:null };
+const mission = { idx:0, active:false, t0:null, tEnd:null, best:null, rounds:0 };
 const mBeacon = new THREE.Mesh(new THREE.CylinderGeometry(1.0,1.0,26,12,1,true),
   new THREE.MeshBasicMaterial({color:0xfbbf24,transparent:true,opacity:0.3,side:THREE.DoubleSide}));
 mBeacon.visible=false; scene.add(mBeacon);
@@ -369,6 +376,19 @@ let ePrev=false;
 function missionTick(){
   if(!mission.active && tDone!==null && mission.idx===0){ mission.active=true;
     setTimeout(()=>{ if(!mission.tEnd) document.getElementById('done').style.display='none'; }, 3500); }
+  // replay: a finished round re-arms at the market with the best time on offer
+  if(mission.tEnd!==null){
+    const m0=M_POINTS[0];
+    const near0=Math.hypot(player.position.x-m0.x,player.position.z-m0.z)<4;
+    promptEl.style.display=near0?'block':'none';
+    if(near0) promptEl.textContent=`E — run the round again (best ${(mission.best/1000).toFixed(1)} s)`;
+    const e=!!keys.KeyE;
+    if(near0 && e && !ePrev){
+      mission.idx=0; mission.t0=null; mission.tEnd=null;
+      document.getElementById('done').style.display='none';
+    }
+    ePrev=e; mBeacon.visible=false; return;
+  }
   if(!mission.active || mission.idx>=M_POINTS.length){ mBeacon.visible=false; promptEl.style.display='none'; return; }
   const p=M_POINTS[mission.idx];
   mBeacon.visible=true; mBeacon.position.set(p.x,13,p.z);
@@ -381,10 +401,15 @@ function missionTick(){
     mission.idx++; ding();
     basket.visible = mission.idx>=1 && mission.idx<4;
     if(mission.idx===M_POINTS.length){
-      mission.tEnd=performance.now(); mBeacon.visible=false;
+      mission.tEnd=performance.now(); mBeacon.visible=false; mission.rounds++;
+      const t=mission.tEnd-mission.t0;
+      const newBest = mission.best===null || t<mission.best;
+      if(newBest) mission.best=t;
       const d=document.getElementById('done');
-      d.textContent=`ROUND COMPLETE — ${((mission.tEnd-mission.t0)/1000).toFixed(1)} s`;
+      d.textContent=`ROUND COMPLETE — ${(t/1000).toFixed(1)} s`+
+        (mission.rounds>1 ? (newBest?' — NEW BEST':` (best ${(mission.best/1000).toFixed(1)} s)`) : '');
       d.style.display='block';
+      setTimeout(()=>{ d.style.display='none'; }, 5000);
     }
   }
   ePrev=e;
@@ -401,10 +426,11 @@ window.__game = { get route(){return route.map(r=>[r[1],r[2]])},
   get activeCamera(){return renderer.info.render.frame>0 ? _lastCam : 'none'},
   get anim(){return char.model ? char.active : 'no-character'},
   get world(){return worldReport}, get steps(){return stepCount},
-  get ambience(){return !!ambience},
+  get ambience(){return !!ambience}, get fov(){return gameplayCamera.fov},
   get npcs(){return npcs.map(n=>({x:n.grp.position.x, z:n.grp.position.z, state:n.state}))},
   get mission(){return {idx:mission.idx, total:M_POINTS.length, active:mission.active,
     done:mission.tEnd!==null, seconds:mission.tEnd?(mission.tEnd-mission.t0)/1000:null,
+    best:mission.best?mission.best/1000:null, rounds:mission.rounds,
     target:mission.idx<M_POINTS.length?[M_POINTS[mission.idx].x,M_POINTS[mission.idx].z]:null}},
   get rig(){ if(!char.model) return null;
     const p = char.footBone ? char.footBone.getWorldPosition(new THREE.Vector3()) : null;
@@ -468,6 +494,13 @@ function tick(now){
         const d=document.getElementById('done');
         d.textContent=`ROUTE COMPLETE — ${((tDone-tStart)/1000).toFixed(1)} s`; d.style.display='block'; }
     }
+  }
+
+  // sprint FOV kick — speed you can feel
+  const wantFov = (len>0 && sprinting) ? 76 : 70;
+  if (Math.abs(gameplayCamera.fov - wantFov) > 0.1){
+    gameplayCamera.fov += (wantFov - gameplayCamera.fov) * Math.min(1, 8*dt);
+    gameplayCamera.updateProjectionMatrix();
   }
 
   // third-person camera, pulled in when a wall occludes the player

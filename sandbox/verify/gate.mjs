@@ -238,6 +238,14 @@ if (routeDone) {
   check('mission: round completed with real E-interactions', ok && m.done,
     m.done ? `${m.seconds.toFixed(1)} s round` : `stalled at leg ${m.idx}/${m.total}`);
   if (!FAULT && m.done) await page.screenshot({ path: path.join(OUT, 'round-complete.png') });
+  // stage 5: a finished round re-arms at the market — E must start a fresh round
+  if (m.done) {
+    await sleep(400);
+    await kb.down('KeyE'); await sleep(120); await kb.up('KeyE'); await sleep(300);
+    const r = await page.evaluate(() => __game.mission);
+    check('mission: replay re-arms with best time kept', r.idx === 0 && !r.done && r.best !== null && r.rounds >= 1,
+      `idx ${r.idx}, done ${r.done}, best ${r.best?.toFixed?.(1)} s, rounds ${r.rounds}`);
+  }
 }
 
 // ---- proof 3: camera ownership across the whole session ----
