@@ -68,7 +68,36 @@ Final r8 judge scores: **market 5, stall 5, barrel 5, crate 4, sacks 2.**
   independently concluded the grooves read as fluting rather than through-holes.
   The operator ruling overrides them and is final. Recorded honestly as a
   disagreement, not as unanimity. DO NOT reopen.
-- **gy-flank — OPEN, score 3.** `builder-B3-r9` was RUNNING at session end.
+- **gy-flank — r9 DELIVERED, AWAITING JUDGE. THIS IS THE FIRST TASK ON RESUME.**
+  `builder-B3-r9` finished and its work is committed and provenance-verified by
+  the parent (blend + glb 20:12:24, all 10 renders 20:12:37 onward, 37,180 tris
+  of 60,000). No judge has seen it — none was spawned, because the verdict would
+  have landed in a session about to be cleared.
+  What it did: moved the DOWNPIPE (`PIPE_Z_RUNS` in gy-flank.py) from z=26 to
+  z=-20 rather than moving the doorway, because the doorway's z=27 is tied into
+  the shared `DOOR_Z_ALL` door rhythm while the pipe's position is two
+  independent numbers — the smaller, more local change. The doorway now has
+  5.45 m clearance to the nearest door and 7.58 m to the nearest window, versus
+  the old 0.45 m gap. Measured in the WIDE frame `gy-flank_face.png` by pixel
+  scan: doorway silhouette 96 px tall x 43-44 px wide = 2.18:1, running
+  uninterrupted from lintel to threshold at the wall base — it reaches the
+  ground, where windows float at y=8.8-9.85 and never do. New frame
+  `gy-flank_walk_door.png` (same 5.5 m / 15 mm / 1.6 m recipe as cam_walk,
+  re-centred on z=27) isolates the doorway at walking distance; the original
+  `gy-flank_walk.png` is unchanged and still shows the gate plus two buttresses,
+  so both walking-distance tests now exist. Script run twice to confirm
+  determinism, identical pixels both times.
+  **TO RESUME: spawn a FRESH judge on B3 (all 5 assets, 10 gy-flank frames +
+  the closed assets' frames, manifest blender/manifests/B3.md, inventory
+  blender/manifests/B3-r9-inventory.txt).** Copy the judge prompt shape from the
+  `judge-B3-r8` spawn — including the efficiency preamble (read each image once,
+  no re-reads, no cropping unless needed, one pass), the ~800-word cap, and the
+  "check edges and corners before calling a frame featureless" warning. Tell it
+  the gaslamp and the B1 sacks are operator-closed and NOT under review.
+  If that judge passes gy-flank at >= 4, B3 is done: re-run the gate, commit,
+  tag `2a-complete`.
+- Superseded context (kept for the record): `builder-B3-r9` was RUNNING at the
+  moment the previous session ended.
   Its work order: the blocked doorway (z=27) reads correctly in its own crop
   `gy-flank_blocked.png` but not in the wide frame, because a downpipe run at
   z=26 crowds it. Move one of them apart, re-measure the doorway's aspect and

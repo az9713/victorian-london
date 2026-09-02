@@ -183,9 +183,25 @@ PIPE_X = FACE_X + PIPE_GAP + PIPE_R
 # coping). Dropped well clear of the coping so the hopper reads as a real
 # separate part below the eaves, the way an actual gutter outlet sits.
 PIPE_TOP = HEIGHT - 1.4
-PIPE_Z_RUNS = [-26.0, 26.0]           # clear of every door/window recess,
-                                       # and close enough to the wall's
-                                       # centre to land inside cam_ctx
+# round-9 fixlist, the ONE placement problem this round exists to fix: the
+# original run at z=26 sat only 0.45 m clear of the bricked doorway's own
+# span (26.45..27.55, added later in round-7, after this pipe's own
+# position was chosen in round-4/5) -- close enough that the doorway and
+# the downpipe's own cast shadow visually fused into one dark patch in the
+# wide gy-flank_face.png, which is the judge's exact "small, roughly square
+# dark patch, crowded by the pipe and its shadow" finding. Rather than move
+# the doorway (which would mean re-deriving its position inside the shared
+# DOOR_Z_ALL door rhythm), moved this ONE pipe run instead -- the simpler,
+# more local change, and the doorway's own jamb/lintel/threshold shape is
+# untouched either way. New position z=-20.0 sits in a genuinely plain bay:
+# 5.45 m clear of the nearest door span edge (door at z=-14, span
+# -14.55..-13.45) and 7.58 m clear of the nearest window span edge (window
+# at z=-28, span -28.42..-27.58) -- both comfortably past the "at least a
+# couple of metres" clearance target, and far past the previous 0.45 m gap
+# to the doorway. The other run (z=-26.0) is unchanged.
+PIPE_Z_RUNS = [-26.0, -20.0]          # clear of every door/window recess
+                                       # AND of the bricked doorway at z=27
+                                       # (round-9 fix, see above)
 
 
 def build_downpipe(pz):
@@ -743,6 +759,16 @@ cam_face = C.add_camera("cam_face", C.V(15.0, eye, 17.5), C.V(4, 6.0, 17.5), len
 # regardless of where it is centred). Both exclusions are measured and
 # reported, not silently dropped, in the manifest.
 cam_walk = C.add_camera("cam_walk", C.V(9.5, eye, 14.0), C.V(4, 3.3, 14.0), lens=15)
+# round-9 fixlist item 3: gy-flank_walk.png (above) contains the gate and
+# two buttresses but neither the bricked doorway nor the plate -- the
+# fixlist asks the doorway to be tested at the distance a player actually
+# meets it, not only in the wide cam_face frame or the dedicated cam_blocked
+# crop. Added a SECOND walking-distance frame, same recipe as cam_walk
+# exactly (5.5 m standoff, 15 mm lens, 1.6 m eye height, target-y=3.3),
+# re-centred on z=27 (the doorway) instead of z=14 (the gate) -- kept as an
+# ADDITIONAL frame rather than replacing cam_walk, per the fixlist's own
+# instruction to keep a walking-distance frame that shows the gate as well.
+cam_walk_door = C.add_camera("cam_walk_door", C.V(9.5, eye, 27.0), C.V(4, 3.3, 27.0), lens=15)
 # _34 round-3 refit: pixel-checked the r3 render -- values were ~189/255,
 # NOT clipped white. The apparent "white-out" was a framing problem: the
 # target height (4.5m) sits in the middle of the LARGEST deliberately blank
@@ -832,7 +858,8 @@ for _hz, _hy in ((14.0, 1.925), (14.0, 0.225)):
     bpy.context.collection.objects.link(_pl_obj)
 
 backup = C.apply_clay_override([obj])
-for cam, name in ((cam_face, "face"), (cam_walk, "walk"), (cam_34, "34"), (cam_detail, "detail"),
+for cam, name in ((cam_face, "face"), (cam_walk, "walk"), (cam_walk_door, "walk_door"),
+                   (cam_34, "34"), (cam_detail, "detail"),
                    (cam_window, "window"), (cam_ctx, "ctx"), (cam_blocked, "blocked"),
                    (cam_plate, "plate")):
     bpy.context.scene.camera = cam
