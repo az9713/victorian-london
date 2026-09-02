@@ -5,7 +5,7 @@ document: how to play, what shipped, verification, perf, gotchas). Full
 per-stage history and every judge-loop trajectory: `HANDOFF-HISTORY.md`.
 Local git repo, NO remote by design — commits + tags are the durable record.
 
-## Current state (as of 2026-09-02, commit after `ship-v1`)
+## Current state (as of 2026-09-02, tag `ambient-v1`)
 - Six stages shipped at tag `ship-v1` (commit 051dedd). Gate `sandbox/verify/gate.mjs`
   16/16 on a quiet machine at that tag.
 - **2026-09-02 finding (the operator):** the build did not match
@@ -21,29 +21,35 @@ Local git repo, NO remote by design — commits + tags are the durable record.
   `MeshBasicMaterial`, unlit, so it now stands out at night). Not a defect.
 - Gate NOT re-run after the night grade (lighting only; no collider change).
 
+## Ambient pass — DONE 2026-09-02, tag `ambient-v1` (commit 35ff0bf), gate 16/16
+All in `sandbox/index.html` + `sandbox/assets.js`, no new files/deps:
+- Wet cobbles (`roughness` 0.35), soot brick tint `0x7a6a58` / stone `0x9a948a`
+  (`0x5a4a3a` rendered walls black), lamp halo sprite 3 m + far corona 9 m, flicker,
+  12 NPCs (4 costermonger `spawnNPC('')`, 5 flower girls, 3 constables), ghost signs
+  BOVRIL / PEAR'S SOAP / TRUMAN'S ALES, 107 bollards x=52 z 26–185 WITH colliders
+  (not z>185: route crosses that kerb at z≈248), beacon opacity 0.10.
+- Sound in `startAmbience()`: murmur 300–2000 Hz, cab pass (hooves + axle rattle)
+  every 20–40 s, bell every 60 s, viaduct train rumble every 2–4 min scaled by
+  distance to z=10. `footstep(sprint, vol)` — `vol!==1` calls skip `stepCount`.
+- **Black-wall fix:** cause was light level, not normals (walls got 0.5 × near-black
+  hemisphere ground term). Now `HemisphereLight(0x4a4030, 0x3a3226, 3.5)`, moon 0.4.
+  Characters are emissive `[1,1,1]` in the GLB, so they read bright regardless.
+- Gin palace: warm glazing strip on the x=69 front + 3 PointLights + halos.
+- Drifting fog: 36 sprites on 6 street axes, `fogTick()`; `fog:false` halos.
+- `verify/gate.mjs` NPC check is now `>= 2` (was `=== 2`).
+- Perf: idle 68 fps with crowd vs 70 without on a quiet run; a later run read 49 on
+  a loaded machine (37% CPU idle, 36 chrome procs). A/B: fog sprites and palace lights
+  cost 0. Re-measure with `verify/datum.mjs` on a quiet machine before trusting.
+- **Do not open the game in a second Chrome window while gate/look/datum run** —
+  the hidden window's rAF throttles to 1 fps and the tour fails.
+
 ## Next task
-- **Ambient richness pass — approved plan, the operator said "give a plan", not yet "go".**
-  Confirm with the operator, then do in order (all in `sandbox/index.html` + `sandbox/assets.js`,
-  no new files, no new deps, ~90 lines):
-  1. Wet cobble sheen — ground material `roughness` 0.35 (`assets.js:164-175`).
-  2. Soot brick — `MAT_TINT.brick` `0xb09c80` → ~`0x5a4a3a`; stone → ~`0x9a948a` (`assets.js:58`).
-  3. Lamp glow halos — additive `Sprite` + radial `CanvasTexture` per lamp (~8 lines).
-  4. Lamp flicker — keep lights in an array, intensity `40 + 6*sin(t*17+i)*rand` in tick.
-  5. Crowd — ~10 more `spawnNPC` calls on Commercial St / Brick Lane / Dorset St / plaza;
-     4-char change so `spawnNPC('')` loads `idle.glb`/`walk.glb` (costermonger).
-     Mix 4 costermongers, 4 flower girls, 2 constables. Re-measure fps; iGPU risk.
-  6. Sound layers in `startAmbience()` — crowd murmur (band-pass noise 300–2000 Hz),
-     hooves (reuse `footstep()` in a 4-beat pattern every 20–40 s), church bell
-     (220+440 Hz decaying, every 60 s). Procedural, no files.
-  7. Ghost signs — `CanvasTexture` text planes ("BOVRIL", "PEAR'S SOAP") on 3 walls.
-  8. Bollards — 0.85 m cylinders every 1.5 m along the Commercial St kerb, WITH colliders.
-  9. Beacon opacity 0.28 → 0.10 (`index.html:343`).
-  Then: play the route in Chrome; run `node sandbox/verify/gate.mjs` (step 8 adds
-  colliders); read `__game.fps` at spawn — median under 60 → remove NPCs first.
-  Commit + tag `ambient-v1`.
-- Skipped on purpose: drifting fog patches, day/night cycle (`?day=1` switch if
-  the old grade is wanted back), soot gradient by height, chimney smoke, barrows.
-- If the user asks for anything else, that takes precedence.
+Remaining atmosphere items, in order (from research §7/§10):
+1. Vendor cries (needs audio files or speech synth — no file-free path). Ask the operator.
+2. Handheld lantern on one constable (one PointLight parented; iGPU cost).
+3. Content: barrows, horse troughs, crates; chimney smoke; soot gradient by height.
+4. `?day=1` switch only if the old grade is wanted back.
+Then judge: fresh look tour (`node sandbox/verify/look.mjs`) vs refpack, on a quiet machine.
 
 ## Play it
 `cd ~/Downloads/projects/victorian-london && python -m http.server 8123 -d sandbox`
