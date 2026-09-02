@@ -45,10 +45,11 @@ const L = buildLayout();
 
 // ---------- scene ----------
 const scene = new THREE.Scene();
-// stage 4 atmosphere, graded against refpack/tier2/hero.jpg: green-grey coal smog,
-// strong aerial perspective (distant terraces dissolve), soft overcast key
-scene.background = new THREE.Color(0xb4baa8);
-scene.fog = new THREE.Fog(0xb4baa8, 35, 290);
+// atmosphere per research/victorian-london.md §7/§10: night pea-souper, brown-orange-grey,
+// visibility 20-40 m, gaslight pools with true dark between (not the day hero grade)
+const SMOG = 0x3d3226;
+scene.background = new THREE.Color(SMOG);
+scene.fog = new THREE.Fog(SMOG, 8, 40);
 const gameplayCamera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 600);
 gameplayCamera.name = 'gameplay';
 const renderer = new THREE.WebGLRenderer({antialias:true});
@@ -60,8 +61,8 @@ document.body.appendChild(renderer.domElement);
 addEventListener('resize', ()=>{ gameplayCamera.aspect=innerWidth/innerHeight;
   gameplayCamera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
 
-scene.add(new THREE.HemisphereLight(0xc9ccba, 0x4c4a42, 1.15));
-const sun = new THREE.DirectionalLight(0xfff0d8, 0.75); sun.position.set(120,180,80); scene.add(sun);
+scene.add(new THREE.HemisphereLight(0x4a4030, 0x14110c, 0.35));   // smog skyglow, no sun
+const moon = new THREE.DirectionalLight(0x8090b0, 0.08); moon.position.set(120,180,80); scene.add(moon);
 
 // ---------- greybox from layout records: every record = mesh + (optional) collider ----------
 const colliders = [];                                   // {x1,z1,x2,z2}
@@ -122,8 +123,10 @@ scene.add(track('ground', ground));
 for (const g of L.lamps){
   const p=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,2.4,8), mat(DARK));
   p.position.set(g.x,1.2,g.z); scene.add(track('lamp', p));
-  const h=new THREE.Mesh(new THREE.BoxGeometry(.28,.34,.28), mat(0xd8c98a));
+  const h=new THREE.Mesh(new THREE.BoxGeometry(.28,.34,.28), new THREE.MeshBasicMaterial({color:0xffd58a}));
   h.position.set(g.x,2.45,g.z); scene.add(track('lamp', h));
+  // gas flame ~2600 K; pool ~9 m wide then dark (research §7). Survives the GLB lamp swap.
+  const gl=new THREE.PointLight(0xffb45a, 40, 14, 2); gl.position.set(g.x,2.4,g.z); scene.add(gl);
 }
 
 // progressive asset upgrade (no-op until builder GLBs land in assets/models/)
