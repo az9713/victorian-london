@@ -33,9 +33,9 @@ const triAreaOf = geom => {          // local-space surface area, cached on the 
 };
 const MAT_FLAT = {   // color/rough/metal for non-textured names
   iron:        { color: 0x2a2c2e, roughness: 0.55, metalness: 0.85 },
-  // near-opaque sooty glazing: windows read as dark Victorian glass instead of
-  // see-through holes into hollow module interiors
-  glass:       { color: 0x1c232a, roughness: 0.12, metalness: 0.0, transparent: true, opacity: 0.88 },
+  // sooty glazing: dark enough to hide hollow module interiors, light enough that
+  // the market's glazed roof still reads luminous (assembly judge note)
+  glass:       { color: 0x5a6672, roughness: 0.10, metalness: 0.0, transparent: true, opacity: 0.55 },
   paint_dark:  { color: 0x25321f, roughness: 0.6 },
   paint_green: { color: 0x2e4a34, roughness: 0.55 },
   postbox_red: { color: 0x8a1c1c, roughness: 0.5 },

@@ -45,19 +45,23 @@ const L = buildLayout();
 
 // ---------- scene ----------
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x8fa3b8);          // flat overcast sky (clay stage)
-scene.fog = new THREE.Fog(0x8fa3b8, 120, 420);
+// stage 4 atmosphere, graded against refpack/tier2/hero.jpg: green-grey coal smog,
+// strong aerial perspective (distant terraces dissolve), soft overcast key
+scene.background = new THREE.Color(0xb4baa8);
+scene.fog = new THREE.Fog(0xb4baa8, 35, 290);
 const gameplayCamera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 600);
 gameplayCamera.name = 'gameplay';
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
 document.body.appendChild(renderer.domElement);
 addEventListener('resize', ()=>{ gameplayCamera.aspect=innerWidth/innerHeight;
   gameplayCamera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
 
-scene.add(new THREE.HemisphereLight(0xcfd8e3, 0x55606b, 1.0));
-const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(120,180,80); scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xc9ccba, 0x4c4a42, 1.15));
+const sun = new THREE.DirectionalLight(0xfff0d8, 0.75); sun.position.set(120,180,80); scene.add(sun);
 
 // ---------- greybox from layout records: every record = mesh + (optional) collider ----------
 const colliders = [];                                   // {x1,z1,x2,z2}
@@ -272,8 +276,30 @@ function occludeT(ox,oy,oz, dx,dy,dz){
 }
 
 // ---------- procedural audio: footsteps on cobbles (WebAudio, no asset files) ----------
-let AC=null, stepTimer=0, stepCount=0;
-function ensureAudio(){ try{ AC ??= new AudioContext(); if(AC.state==='suspended') AC.resume(); }catch(e){} }
+let AC=null, stepTimer=0, stepCount=0, ambience=null;
+function ensureAudio(){ try{ AC ??= new AudioContext(); if(AC.state==='suspended') AC.resume();
+  startAmbience(); }catch(e){} }
+// stage 4 ambience bed — procedural, no asset files: low city rumble + wind band,
+// slow independent swells so it never reads as a loop
+function startAmbience(){
+  if(ambience || !AC) return;
+  const master=AC.createGain(); master.gain.value=0.05; master.connect(AC.destination);
+  const noise=AC.createBufferSource();
+  const buf=AC.createBuffer(1, AC.sampleRate*4, AC.sampleRate), d=buf.getChannelData(0);
+  let last=0;                                              // brown-ish noise
+  for(let i=0;i<d.length;i++){ last=(last+(Math.random()*2-1)*0.02)*0.995; d[i]=last*8; }
+  noise.buffer=buf; noise.loop=true;
+  const rumble=AC.createBiquadFilter(); rumble.type='lowpass'; rumble.frequency.value=180;
+  const wind=AC.createBiquadFilter(); wind.type='bandpass'; wind.frequency.value=650; wind.Q.value=0.6;
+  const gR=AC.createGain(), gW=AC.createGain(); gR.gain.value=0.8; gW.gain.value=0.10;
+  noise.connect(rumble); rumble.connect(gR); gR.connect(master);
+  noise.connect(wind); wind.connect(gW); gW.connect(master);
+  const lfo=AC.createOscillator(), lg=AC.createGain();      // slow wind swell
+  lfo.frequency.value=0.07; lg.gain.value=0.06;
+  lfo.connect(lg); lg.connect(gW.gain); lfo.start();
+  noise.start();
+  ambience={master};
+}
 addEventListener('keydown', ensureAudio); addEventListener('mousedown', ensureAudio);
 function footstep(sprint){
   stepCount++;
@@ -375,6 +401,7 @@ window.__game = { get route(){return route.map(r=>[r[1],r[2]])},
   get activeCamera(){return renderer.info.render.frame>0 ? _lastCam : 'none'},
   get anim(){return char.model ? char.active : 'no-character'},
   get world(){return worldReport}, get steps(){return stepCount},
+  get ambience(){return !!ambience},
   get npcs(){return npcs.map(n=>({x:n.grp.position.x, z:n.grp.position.z, state:n.state}))},
   get mission(){return {idx:mission.idx, total:M_POINTS.length, active:mission.active,
     done:mission.tEnd!==null, seconds:mission.tEnd?(mission.tEnd-mission.t0)/1000:null,
