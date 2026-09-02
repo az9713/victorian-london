@@ -47,6 +47,38 @@ Pipeline restarted after the pause. Fresh builders `builder-B1-r5b` and
 BRIEF-COMMON.md + batch brief + its fixlist verbatim + the WIP resume state
 below. Orchestration only on Opus 5.
 
+## ▶ SESSION 2026-09-01 (Opus 5): goal = finish stages 3-6 autonomously
+- **B3 r9 judge**: spawned fresh (`judge-B3-r9`, sonnet) per the resume block; prodded once
+  after idle-with-no-report. If silent again: respawn from the same prompt shape.
+- **B4 REOPENED (r2)**: in-game lookdev found terrace modules' slate roof covers only the
+  front strip — most of each 5x14 footprint is open sky from above. `builder-B4-r2` (sonnet)
+  is extending roofs on all 6 modules. Countable gate: top-view render per module, zero sky
+  pixels in footprint; facades untouched; <12k tris each.
+- **Stage 3 assembly fixes landed (commits b28a814, 5c9ffff)** — all in sandbox/assets.js
+  + index.html:
+  - Texel density: smart_project packs each object's UVs into 0-1, so repeat =
+    sqrt(mesh area)/metres-per-tile, cached per material|repeat. Ground pattern kept.
+  - brick tile overridden to 1.2 m (brown_brick_02 at declared 2 m gives 22 cm courses).
+  - DoubleSide on all shared materials: builder walls are single-sided; street sides of
+    rookery/gy-flank/market rendered as hollow skeletons before this.
+  - Sooty near-opaque glazing (0x1c232a @ 0.88) — windows no longer see-through to hollow interiors.
+  - Tints: stone 0xd6d2c8 (Portland), brick 0xb09c80 (London stock yellow-brown, per hero.jpg).
+  - Camera wall-clip fixed: k = max(0.03, min(t*0.95, t-0.02)) — floor no longer pushes
+    the camera through walls when the player backs against one.
+- **New tools** (sandbox/verify/): look.mjs = waypointed lookdev tour -> verify/look/*.png;
+  inspect.mjs + inspect.html = single-GLB clay probe (front/back/top/three4) + per-mesh
+  area/UV/material JSON. Aerial: load /?fault=cam and screenshot (debug top camera).
+- **Gate runs during builder Cycles renders are garbage** (walk speed measured 1.7 m/s vs 4;
+  rAF starved). Gate/perf = quiet machine only. Last CLEAN gate: 15/15 @ 72 fps median
+  (pre-fixes baseline, commit 5c9ffff parent).
+- NEXT: (1) B3 verdict -> tag 2a-complete (+ tag 2a-market-pass); (2) B4 r2 delivery ->
+  fresh B4 judge; (3) full look tour re-capture on quiet tree -> assembly judge (fresh
+  sonnet, in-game shots vs refpack) -> fix round if needed -> gate re-run -> commit, tag
+  stage3-assembly-pass; (4) stage 4 fog/ambience to tier2 hero (procedural WebAudio beds,
+  no paid audio); (5) stage 5 feel polish by playing; (6) stage 6 quiet-machine perf
+  (uncapped median + paced p95, NAME the rendered resolution: index.html clamps dpr 1.5,
+  datum was dpr1 720p), HANDOVER.md, final tag.
+
 ## ✅ STAGE 2a STATUS as of 2026-09-01 end of session — READ THIS FIRST
 
 **B1 is CLOSED. B3 has ONE open asset with a builder running on it.**
