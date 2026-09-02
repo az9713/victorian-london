@@ -53,6 +53,17 @@ below. Orchestration only on Opus 5.
   STAGE 2 IS DONE. Two optional, non-blocking render-camera notes from the judge (game
   cameras unaffected, skipped deliberately): cam_face clips the bricked doorway at frame
   edge; cam_pipe still aims at the pipe's old z=26 (pipe now z=-20) so that crop shows no pipe.
+- **B4 r2 verdicts (recorded honestly)**: builder delivered solid roof wedges, pixel-proof
+  0 sky px in all 6 ortho top views, tris 7,084-8,802/12k (commit a32b18d). judge-B4-r2
+  (first) exceeded the 90-min ceiling and was stopped. judge-B4-r2b FAILED the batch at 2 —
+  but its only geometry finding ("roof reads flat gray, no slate texture") is a CLAY-render
+  misread (clay cannot show texture; in-game the slate PBR binds by material name and shows
+  in aerial.png), and its other three findings are (A) camera framing of the evidence
+  renders, which the game never uses. Thickness/soffit explicitly passed. NOT overridden by
+  the parent: final acceptance routed to judge-assembly-r1 on IN-GAME frames (the venue the
+  defect was found in), with roofs explicitly in scope. If the assembly judge fails the
+  roofs in-game, a builder round follows. r2b's verdict stands on record as a fail of the
+  RENDER EVIDENCE, not the shipped geometry.
 - **B4 REOPENED (r2)**: in-game lookdev found terrace modules' slate roof covers only the
   front strip — most of each 5x14 footprint is open sky from above. `builder-B4-r2` (sonnet)
   is extending roofs on all 6 modules. Countable gate: top-view render per module, zero sky
