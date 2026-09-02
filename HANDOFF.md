@@ -47,7 +47,91 @@ Pipeline restarted after the pause. Fresh builders `builder-B1-r5b` and
 BRIEF-COMMON.md + batch brief + its fixlist verbatim + the WIP resume state
 below. Orchestration only on Opus 5.
 
-### Live loop state (update every round)
+## ✅ STAGE 2a STATUS as of 2026-09-01 end of session — READ THIS FIRST
+
+**B1 is CLOSED. B3 has ONE open asset with a builder running on it.**
+
+### B1 — CLOSED 2026-09-01 (tag it `2a-market-pass` when convenient)
+Final r8 judge scores: **market 5, stall 5, barrel 5, crate 4, sacks 2.**
+- **sacks CLOSED BY OPERATOR ACCEPTANCE.** the operator inspected `sacks_face.png`
+  himself and ruled: "yes they read as filled cloth sacks at walking distance."
+  Four judges had scored it 2 across 8 rounds. The operator is the final
+  authority in this loop (exit = judge passes OR operator stops). Recorded as an
+  operator acceptance over a judge 2, NOT as a judge pass. DO NOT reopen it, and
+  do not let a future judge's finding reopen it.
+- Everything else in B1 passed cleanly. Do not touch B1 again.
+
+### B3 — ONE asset open
+- rookery 4, viaduct-module 4, pillarbox 5 — judge PASS, closed.
+- **gaslamp CLOSED BY OPERATOR ACCEPTANCE 2026-09-01.** the operator inspected
+  `gaslamp_vent.png` and ruled it reads as a vent. THREE judges (r6b, r7, r8)
+  independently concluded the grooves read as fluting rather than through-holes.
+  The operator ruling overrides them and is final. Recorded honestly as a
+  disagreement, not as unanimity. DO NOT reopen.
+- **gy-flank — OPEN, score 3.** `builder-B3-r9` was RUNNING at session end.
+  Its work order: the blocked doorway (z=27) reads correctly in its own crop
+  `gy-flank_blocked.png` but not in the wide frame, because a downpipe run at
+  z=26 crowds it. Move one of them apart, re-measure the doorway's aspect and
+  vertical extent IN `gy-flank_face.png`, and make a walking-distance frame that
+  actually contains the doorway (`gy-flank_walk.png` currently contains neither
+  the doorway nor the plate). On resume: check `ListAgents` first — if
+  builder-B3-r9 is idle/dead, check file mtimes in `blender/B3/` and spawn a
+  fresh builder from this paragraph rather than messaging the dead one.
+- After gy-flank passes: re-run the gate (`python -m http.server 8123 -d sandbox`,
+  then `node sandbox/verify/gate.mjs`), commit, tag `2a-complete`, go to stage 3.
+
+### THE LESSON THAT COST THE MOST ROUNDS — apply it in stage 3
+**Both problem assets were UNDER-BUILT, not badly rendered, and the budget proved
+it.** gy-flank sat at 30,446 tris of a 60,000 cap; sacks at 5,088 of 8,000. Each
+absorbed 4-8 rounds of increasingly clever fixes to lighting, framing, camera
+angle and generator parameters while the budget that would have solved them went
+unspent. No judge could see this — judges see frames, not tri counts. **The
+parent must diff tri counts against budget every round and treat a large unspent
+budget on a failing asset as the primary suspect.**
+Corollary that finally moved gy-flank: five rounds of lighting/framing work did
+nothing; ADDING REAL PARTS (buttresses, coping, bricked-up doorway, gate piers)
+moved it 2→3 on the first attempt.
+
+### Other transferable rules this stage paid for
+1. **Shallow-geometry vs framing.** When a modelled feature does not register,
+   decide whether the camera missed it (A) or it is too shallow/thin to read at
+   standing distance (B). Opposite fixes; taking (A) alone means the builder
+   crops tighter, the crop "proves" it, and the object stays wrong in-game.
+   Precedent: two arch-ring orders at 0.08 m and 0.18 m proud on a 13.3 m arch
+   existed in geometry and rendered as one flat face.
+2. **Three-round rule.** A feature failing three rounds has a wrong APPROACH,
+   not wrong parameters. Gaslamp vent: absent → shallow steps → proud ribs, all
+   variants of "decorate a solid cap", when the answer was "cut a hole".
+   Sacks: 6 rounds of ring-generator tuning; a lathe is circumferentially
+   uniform BY CONSTRUCTION and cannot express irregular cloth folds. Cloth
+   simulation fixed the stall canopy (2→5) immediately.
+3. **Silhouette beats contrast.** The boundary plate was invisible because it
+   was 0.8:1 portrait — the same aspect as a window. No darkening separates two
+   things that are the same shape. Rebuilt landscape 2.2:1 and proud-mounted, it
+   became distinguishable by three independent cues.
+4. **Clean provenance never means correct content.** Frames can postdate their
+   blend and still be wrong: one was blank grey (camera aimed 0.58 m outside the
+   mesh bbox), one was stale because a render call was dropped in a rewrite, one
+   held 9,985 black pixels from a real formula bug.
+5. **Judges misread.** Two findings on assets NOBODY had rebuilt were wrong
+   (`rookery_boarded.png` described as blank when it plainly shows 5 boards with
+   nail heads). **Test any judge finding on an untouched asset by checking
+   whether the file actually changed** — `stat` + `git log -- <path>`. If it did
+   not change since it passed, the finding is suspect and the parent may open
+   the file to check the FACT of its contents (not to score it).
+6. **A judge can hang.** `judge-B3-r6` ran 10 h with no output and was
+   TaskStop'd. Respawning with "read each image once, do not re-read, do not
+   crop unless necessary, finish in one pass" fixed it. Cap judge reports at
+   ~800 words too — three long reports arrived truncated mid-verdict.
+7. **Builders die silently.** `builder-B1-r7` went idle waiting on backgrounded
+   Cycles renders and was dead 11 h. Tell builders to run renders in the
+   FOREGROUND. File-silent > 1 h means check `ListAgents`, then spawn fresh from
+   the fixlist — never message the dead one.
+8. **Absent evidence is failure.** Verified properties with no delivered frame
+   score as unevidenced. Check the delivered render set against the fixlist's
+   claims BEFORE spawning the judge; it costs one message and saves a round.
+
+### Historical loop detail below (superseded by the block above)
 
 **B3 trajectory: r2 min 3 → r3 min 2 → r4 min 3 → r5 IN FLIGHT (`builder-B3-r5`).**
 r4 scores: gy-flank 3, viaduct-module 3, gaslamp 3, rookery 4, pillarbox 4.
