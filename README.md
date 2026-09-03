@@ -1,5 +1,11 @@
 # victorian-london
 
+### ▶ [**Play it in your browser**](https://az9713.github.io/victorian-london/)
+
+![Commercial Street at night — gaslight on wet cobbles](media/preview.gif)
+
+*Eight seconds of the acceptance gate walking the route, unedited.*
+
 A playable third-person 3D slice of 1880s Whitechapel and Spitalfields. It runs
 in a browser. It has no build step and no framework — three.js from a CDN, one
 HTML file, two JavaScript modules.
@@ -12,6 +18,11 @@ Built with the **[RemakeBench skills pipeline](https://github.com/RemakeBench/sk
 — see [Credit](#credit) below.
 
 ## Play it
+
+Easiest: **[play the hosted build](https://az9713.github.io/victorian-london/)** —
+no install, no clone. Chrome or Edge recommended; it needs WebGL2.
+
+To run it locally instead:
 
 ```bash
 cd <this folder>
