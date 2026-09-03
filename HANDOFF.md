@@ -5,21 +5,21 @@ document: how to play, what shipped, verification, perf, gotchas). Full
 per-stage history and every judge-loop trajectory: `HANDOFF-HISTORY.md`.
 Local git repo, NO remote by design — commits + tags are the durable record.
 
-## Current state (as of 2026-09-02, tag `ambient-v1`)
-- Six stages shipped at tag `ship-v1` (commit 051dedd). Gate `sandbox/verify/gate.mjs`
-  16/16 on a quiet machine at that tag.
-- **2026-09-02 finding (the operator):** the build did not match
-  `research/victorian-london.md` §7/§10 (night pea-souper, gaslight pools, soot
-  brick, crowds). Root cause: `refpack/README.md` took only the NUMBERS from the
-  research; the atmosphere sections never became spec lines, and the approved
-  tier-2 hero was a DAY market, so stage 4 graded to daylight.
-- **Night grade applied** in `sandbox/index.html` (committed this session):
-  sky+fog `0x3d3226`, fog 8→40 m, dim smog hemisphere + faint moon, one warm
-  `PointLight` (2600 K, 40 cd, 14 m) per gas lamp, self-lit lamp head. Verified
-  by loading in Chrome: dark street, warm pools, black between. No console errors.
-- The teal column in play is the route checkpoint beacon (`index.html:342-344`,
-  `MeshBasicMaterial`, unlit, so it now stands out at night). Not a defect.
-- Gate NOT re-run after the night grade (lighting only; no collider change).
+## Current state (as of 2026-09-02, tag `ambient-v1`, commit 35ff0bf)
+- Six stages shipped at `ship-v1` (051dedd), then night grade (20cab0a), then the
+  ambient pass (35ff0bf = `ambient-v1`). Gate 16/16 at `ambient-v1`. Tree clean.
+- **Why the atmosphere work happened (2026-09-02 finding, the operator):** the shipped
+  build did not match `research/victorian-london.md` §7/§10 — night pea-souper,
+  gaslight pools, soot brick, crowds. Root cause: `refpack/README.md` took only the
+  NUMBERS from the research; the atmosphere sections never became spec lines, and
+  the approved tier-2 hero was a DAY market, so stage 4 graded to daylight.
+  **Lesson for the next world: write an Atmosphere block into the refpack before
+  stage 1.**
+- Night grade now in `sandbox/index.html`: sky+fog `0x3d3226`, fog 8→40 m,
+  `HemisphereLight(0x4a4030, 0x3a3226, 3.5)`, moon 0.4, one warm `PointLight`
+  (2600 K, 40 cd, 14 m) per gas lamp, self-lit lamp head.
+- The teal column in play is the route checkpoint beacon (`MeshBasicMaterial`,
+  unlit, opacity 0.10). Not a defect.
 
 ## Ambient pass — DONE 2026-09-02, tag `ambient-v1` (commit 35ff0bf), gate 16/16
 All in `sandbox/index.html` + `sandbox/assets.js`, no new files/deps:
@@ -63,14 +63,24 @@ with `-d sandbox` 404s — the flag is relative to cwd.)
 - `refpack/README.md` — the spatial authority (datum, landmarks, route). Numbers only.
 - `sandbox/index.html` + `layout.js` + `assets.js` — the entire game (~700 lines).
 - `sandbox/verify/` — `gate.mjs` (acceptance), `feel.mjs`, `look.mjs`
-  (lookdev tour → `verify/look/*.png`, all DAY-grade, stale), `inspect.mjs`,
+  (lookdev tour → `verify/look/*.png`; brick-lane / rookery / ginpalace are
+  current night-grade shots, the rest are stale DAY-grade), `inspect.mjs`,
   `datum.mjs` (perf). All need the server on 8123 and a VISIBLE Chrome window.
 - Pipeline skills (plugin `remakebench-skills`): `game-production-stages` first.
 
-## Session-transient scratch (nothing to regenerate)
-Every tool this project used is committed under `sandbox/verify/`. The aerial
-shot pattern: load `/?fault=cam` (fog-free 290 m debug camera) and screenshot.
-`?fault=cam` drops fog but keeps the night lights — the aerial is now dark.
+## Session-transient scratch (regenerate; durable record is `sandbox/verify/`)
+Every committed tool lives under `sandbox/verify/`. Two throwaway patterns used
+on 2026-09-02, deliberately NOT committed:
+- **Fast idle-fps probe** (`datum.mjs` takes 85 s; this takes 20 s and records no
+  video): a ~10-line Playwright script — launch headed 1280x720, goto
+  `http://localhost:8123/` + optional query, `sleep 20_000`, print
+  `__game.fps` and `__game.npcs.length`. Drop it in `verify/`, run, delete.
+- **A/B a feature's fps cost:** `sed -i` the loop bound or array to empty
+  (e.g. `for (let i=0;i<6;i++)` → `i<0`), re-probe, `sed -i` it back, then
+  `grep -c` to confirm the restore. Verified fog sprites and gin-palace lights
+  each cost 0 fps this way.
+- **Aerial shot:** load `/?fault=cam` (290 m debug camera, fog off) and screenshot.
+  It keeps the night lights, so the aerial is now dark.
 
 ## How to work (essentials)
 - Gate/perf only on a QUIET machine — Blender renders starve rAF and corrupt
