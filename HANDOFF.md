@@ -65,8 +65,9 @@ Then judge: fresh look tour (`node sandbox/verify/look.mjs`) vs refpack, on a qu
     — only decoding them did). `.blend`/`.pyc` need a SAME-LENGTH replacement.
     `--replace-text` skips binaries entirely; `--blob-callback` does not.
   - All commit hashes changed. Docs were remapped from `.git/filter-repo/commit-map`.
-  - Backup of the pre-rewrite repo: `../victorian-london-PREREWRITE.bundle` (423 MB).
-    Delete once you are satisfied.
+  - The pre-rewrite backup bundle was DELETED 2026-09-03 after verifying remote ==
+    local, fsck clean, 160/160 PNGs decode, and the live site serving. There is no
+    rollback to the un-scrubbed history; GitHub + this clone are the only copies.
 - Scrub convention: OS username → `USERNAME`, operator name → `the operator`.
   KEPT on purpose: `az9713` (the Pages URL requires it) and the commit-author email.
 - `media/preview.gif` (3.8 MB) is cut from a real gate recording, README top.
