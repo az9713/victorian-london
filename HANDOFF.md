@@ -3,7 +3,9 @@
 **Read this first each new session.** Then `HANDOVER.md` (the shipped-build
 document: how to play, what shipped, verification, perf, gotchas). Full
 per-stage history and every judge-loop trajectory: `HANDOFF-HISTORY.md`.
-Local git repo, NO remote by design — commits + tags are the durable record.
+**PUBLISHED 2026-09-03:** https://github.com/az9713/victorian-london (public) and
+playable at **https://az9713.github.io/victorian-london/**. `origin` is set; push
+normally. Pages serves `main` at root; `/index.html` redirects to `sandbox/`.
 
 ## Current state (as of 2026-09-02, tag `ambient-v1`, commit 8281a50)
 - Six stages shipped at `ship-v1` (9af4e69), then night grade (34efdf4), then the
@@ -50,6 +52,24 @@ Remaining atmosphere items, in order (from research §7/§10):
 3. Content: barrows, horse troughs, crates; chimney smoke; soot gradient by height.
 4. `?day=1` switch only if the old grade is wanted back.
 Then judge: fresh look tour (`node sandbox/verify/look.mjs`) vs refpack, on a quiet machine.
+
+## Published + history rewrite (2026-09-03)
+- Public repo + GitHub Pages live (links at top). Verified by loading the Pages URL
+  in Chrome: world renders, lamps/fog/NPC/rig all present. Every asset path 200s.
+- **History was rewritten** (`git-filter-repo`) to remove the OS username and the
+  operator's name from all 87 commits, blobs and commit messages. Verified 0 hits
+  with `git cat-file --batch-all-objects --batch | grep -aic simon`.
+  - Binary-safe rules, KEEP THESE if you ever rewrite again: PNGs carry a CRC32 per
+    chunk, so bytes must be replaced chunk-wise with the CRC recomputed (a raw
+    same-length replace silently broke 53 renders and a size check did NOT catch it
+    — only decoding them did). `.blend`/`.pyc` need a SAME-LENGTH replacement.
+    `--replace-text` skips binaries entirely; `--blob-callback` does not.
+  - All commit hashes changed. Docs were remapped from `.git/filter-repo/commit-map`.
+  - Backup of the pre-rewrite repo: `../victorian-london-PREREWRITE.bundle` (423 MB).
+    Delete once you are satisfied.
+- Scrub convention: OS username → `USERNAME`, operator name → `the operator`.
+  KEPT on purpose: `az9713` (the Pages URL requires it) and the commit-author email.
+- `media/preview.gif` (3.8 MB) is cut from a real gate recording, README top.
 
 ## Play it
 `cd ~/Downloads/projects/victorian-london && python -m http.server 8123 -d sandbox`
