@@ -291,7 +291,7 @@ never destabilise a passing asset to chase fidelity.
 - B3 manifest B3.md stale (10:31).
 
 ### ⏸ Previous pause (2026-08-31 19:40 PT, historical)
-the operator paused the pipeline to change the session model (Fable was at 7% with
+The operator paused the pipeline to change the session model (Fable was at 7% with
 a reset >2 days out). **Session model is now Opus 5** (set 19:45 PT via
 /model opus, saved as the default for new sessions). Both running builders
 were TaskStop'd at 19:38; their WIP is committed (117c7b3).

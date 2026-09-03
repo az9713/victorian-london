@@ -8,7 +8,7 @@ Local git repo, NO remote by design — commits + tags are the durable record.
 ## Current state (as of 2026-09-02, tag `ambient-v1`, commit 35ff0bf)
 - Six stages shipped at `ship-v1` (051dedd), then night grade (20cab0a), then the
   ambient pass (35ff0bf = `ambient-v1`). Gate 16/16 at `ambient-v1`. Tree clean.
-- **Why the atmosphere work happened (2026-09-02 finding, the operator):** the shipped
+- **Why the atmosphere work happened (2026-09-02 finding, from the operator):** the shipped
   build did not match `research/victorian-london.md` §7/§10 — night pea-souper,
   gaslight pools, soot brick, crowds. Root cause: `refpack/README.md` took only the
   NUMBERS from the research; the atmosphere sections never became spec lines, and
