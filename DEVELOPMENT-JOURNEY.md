@@ -1,7 +1,7 @@
 # Development Journey — the ambient richness pass on victorian-london
 
 **Date:** 2026-09-02
-**Deliverable:** `sandbox/` in this repo — tags `ambient-v1` (35ff0bf) and the docs that followed
+**Deliverable:** `sandbox/` in this repo — tags `ambient-v1` (8281a50) and the docs that followed
 **Brief:** "make those 9 changes please. ask me if you have any question. Read @HANDOFF.md"
 **Models:** `claude-fable-5-1` for the build; `claude-opus-5` for the last two hours after the operator switched
 **Written from:** the live session transcript
@@ -441,10 +441,10 @@ protocol, which is exactly why it ran before this document.
 
 | Commit | What |
 |---|---|
-| `35ff0bf` | The 15 code changes — tag **`ambient-v1`** |
-| `5081892` | `HANDOFF.md`: black-wall root cause, remaining list |
-| `7598344` | `HANDOFF.md` refresh: pruned three stale claims, recorded scratch patterns |
-| `7958df7` | `README.md` |
+| `8281a50` | The 15 code changes — tag **`ambient-v1`** |
+| `340254c` | `HANDOFF.md`: black-wall root cause, remaining list |
+| `3d2e51d` | `HANDOFF.md` refresh: pruned three stale claims, recorded scratch patterns |
+| `f7052ff` | `README.md` |
 
 Working tree clean. Gate 16/16 at `ambient-v1`.
 

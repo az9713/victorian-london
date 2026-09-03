@@ -5,9 +5,9 @@ document: how to play, what shipped, verification, perf, gotchas). Full
 per-stage history and every judge-loop trajectory: `HANDOFF-HISTORY.md`.
 Local git repo, NO remote by design — commits + tags are the durable record.
 
-## Current state (as of 2026-09-02, tag `ambient-v1`, commit 35ff0bf)
-- Six stages shipped at `ship-v1` (051dedd), then night grade (20cab0a), then the
-  ambient pass (35ff0bf = `ambient-v1`). Gate 16/16 at `ambient-v1`. Tree clean.
+## Current state (as of 2026-09-02, tag `ambient-v1`, commit 8281a50)
+- Six stages shipped at `ship-v1` (9af4e69), then night grade (34efdf4), then the
+  ambient pass (8281a50 = `ambient-v1`). Gate 16/16 at `ambient-v1`. Tree clean.
 - **Why the atmosphere work happened (2026-09-02 finding, from the operator):** the shipped
   build did not match `research/victorian-london.md` §7/§10 — night pea-souper,
   gaslight pools, soot brick, crowds. Root cause: `refpack/README.md` took only the
@@ -21,7 +21,7 @@ Local git repo, NO remote by design — commits + tags are the durable record.
 - The teal column in play is the route checkpoint beacon (`MeshBasicMaterial`,
   unlit, opacity 0.10). Not a defect.
 
-## Ambient pass — DONE 2026-09-02, tag `ambient-v1` (commit 35ff0bf), gate 16/16
+## Ambient pass — DONE 2026-09-02, tag `ambient-v1` (commit 8281a50), gate 16/16
 All in `sandbox/index.html` + `sandbox/assets.js`, no new files/deps:
 - Wet cobbles (`roughness` 0.35), soot brick tint `0x7a6a58` / stone `0x9a948a`
   (`0x5a4a3a` rendered walls black), lamp halo sprite 3 m + far corona 9 m, flicker,

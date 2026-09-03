@@ -19,14 +19,14 @@ quotes, or a judge loop that will not converge.
   Serve: `python -m http.server 8123 -d sandbox`. Gate: `node verify/gate.mjs`.
 - **Stage 2c datum (greybox):** median 145 fps, p95 141, idle == sprint, 1280x720
   dpr1, ANGLE D3D11 on Intel UHD iGPU (NOT the RTX 3050), Chrome/151. `datum.mjs`.
-- **Stage 2 IN FLIGHT** (commit 9f9b566): 5 Polyhaven 2K PBR sets in
+- **Stage 2 IN FLIGHT** (commit 3a7ffe5): 5 Polyhaven 2K PBR sets in
   `sandbox/assets/pbr/` (scales in manifest.json). Character 2b: rigged costermonger
   + Idle(0)/Casual_Walk(30)/Run_02(14) clips in `meshy/costermonger/` (GLBs
   committed). NEXT: 2a builder batches (Blender headless → GLB), 2b Three.js
   integration (rig proof = measured joint motion through GLTFLoader).
 - **Stage 2b DONE** (tag `stage2b-character-playable`): costermonger in-game,
   rig proven (24 bones, LeftFoot, 1.4 m foot swing measured). Camera occlusion in.
-- **Assembly ready** (commit 8689300): `sandbox/assets.js` swaps greybox for GLBs
+- **Assembly ready** (commit 36f494b): `sandbox/assets.js` swaps greybox for GLBs
   at layout records when files appear in `sandbox/assets/models/`; shared PBR
   materials bound BY NAME (brick/slate/planks/plaster/stone/iron/glass/...);
   ground is cobbled. Builder GLB contract = briefs in `blender/briefs/`.
@@ -35,7 +35,7 @@ quotes, or a judge loop that will not converge.
   the route tour; procedural footsteps; gate = 14 checks incl. mission drive.
 - **NPCs rigged**: `meshy/flowergirl/`, `meshy/constable/` (idle+walk GLBs).
   Wander behaviour still to write (stage 5 polish).
-- **NPCs + mission live** (tag `stage5-mission-skeleton`, commit 2199e80): gate
+- **NPCs + mission live** (tag `stage5-mission-skeleton`, commit 973f0d9): gate
   is 15 checks, all passing, incl. mission round + NPC motion (measured).
 - **2a batches:** B4 PASSED (tag `2a-terraces-pass`), B2 PASSED (tag
   `2a-church-ginpalace-pass`). B1 and B3 still open — see PAUSED block below.
@@ -57,12 +57,12 @@ Read HANDOVER.md first from now on; the session block below is history.
 
 ## ▶ SESSION 2026-09-01 (Opus 5): goal = finish stages 3-6 autonomously
 - **B3 CLOSED — judge-B3-r9 PASSED the batch at 4** (gy-flank 4, viaduct 4, rookery 4,
-  pillarbox 5; gaslamp operator-closed). Tagged `2a-complete` (+ `2a-market-pass` at f3afb22).
+  pillarbox 5; gaslamp operator-closed). Tagged `2a-complete` (+ `2a-market-pass` at 7253da1).
   STAGE 2 IS DONE. Two optional, non-blocking render-camera notes from the judge (game
   cameras unaffected, skipped deliberately): cam_face clips the bricked doorway at frame
   edge; cam_pipe still aims at the pipe's old z=26 (pipe now z=-20) so that crop shows no pipe.
 - **B4 r2 verdicts (recorded honestly)**: builder delivered solid roof wedges, pixel-proof
-  0 sky px in all 6 ortho top views, tris 7,084-8,802/12k (commit a32b18d). judge-B4-r2
+  0 sky px in all 6 ortho top views, tris 7,084-8,802/12k (commit 8d7cd49). judge-B4-r2
   (first) exceeded the 90-min ceiling and was stopped. judge-B4-r2b FAILED the batch at 2 —
   but its only geometry finding ("roof reads flat gray, no slate texture") is a CLAY-render
   misread (clay cannot show texture; in-game the slate PBR binds by material name and shows
@@ -76,7 +76,7 @@ Read HANDOVER.md first from now on; the session block below is history.
   front strip — most of each 5x14 footprint is open sky from above. `builder-B4-r2` (sonnet)
   is extending roofs on all 6 modules. Countable gate: top-view render per module, zero sky
   pixels in footprint; facades untouched; <12k tris each.
-- **Stage 3 assembly fixes landed (commits b28a814, 5c9ffff)** — all in sandbox/assets.js
+- **Stage 3 assembly fixes landed (commits 2673f82, 42ff3e2)** — all in sandbox/assets.js
   + index.html:
   - Texel density: smart_project packs each object's UVs into 0-1, so repeat =
     sqrt(mesh area)/metres-per-tile, cached per material|repeat. Ground pattern kept.
@@ -92,7 +92,7 @@ Read HANDOVER.md first from now on; the session block below is history.
   area/UV/material JSON. Aerial: load /?fault=cam and screenshot (debug top camera).
 - **Gate runs during builder Cycles renders are garbage** (walk speed measured 1.7 m/s vs 4;
   rAF starved). Gate/perf = quiet machine only. Last CLEAN gate: 15/15 @ 72 fps median
-  (pre-fixes baseline, commit 5c9ffff parent).
+  (pre-fixes baseline, commit 42ff3e2 parent).
 - NEXT: (1) B3 verdict -> tag 2a-complete (+ tag 2a-market-pass); (2) B4 r2 delivery ->
   fresh B4 judge; (3) full look tour re-capture on quiet tree -> assembly judge (fresh
   sonnet, in-game shots vs refpack) -> fix round if needed -> gate re-run -> commit, tag
@@ -294,7 +294,7 @@ never destabilise a passing asset to chase fidelity.
 The operator paused the pipeline to change the session model (Fable was at 7% with
 a reset >2 days out). **Session model is now Opus 5** (set 19:45 PT via
 /model opus, saved as the default for new sessions). Both running builders
-were TaskStop'd at 19:38; their WIP is committed (117c7b3).
+were TaskStop'd at 19:38; their WIP is committed (91d6336).
 
 **Model rule on resume:** keep spawning builders and judges with
 `model: sonnet` explicitly — Sonnet has done every 2a round competently and
